@@ -9,7 +9,7 @@ except ImportError:
 
 from sh import uv, ollama  # pyright: ignore
 
-uv.init()
-uv.add("ollama", "agno", "cloudpickle")
+print(uv.init())
+print(uv.add("ollama", "agno", "cloudpickle"))
 
 print("Installed uv and ollama")
