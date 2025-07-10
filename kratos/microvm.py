@@ -4,7 +4,7 @@
 
 import base64
 import docker
-from typing import Optional, List
+from typing import Optional, List, Iterator
 
 
 # Configuration
@@ -216,7 +216,7 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     container.stop()
 
 
-def invoke_agent(name: str, instructions: str) -> str:
+def invoke_agent(name: str, instructions: str) -> Iterator[str]:
     """
     Execute a micro-task on a serverless ephemeral agent.
     
@@ -227,8 +227,8 @@ def invoke_agent(name: str, instructions: str) -> str:
         name: Identifier of the ephemeral agent instance
         instructions: Micro-task instructions for the agent to execute
         
-    Returns:
-        Task execution result from the ephemeral agent
+    Yields:
+        Task execution result chunks from the ephemeral agent as they are generated
         
     Raises:
         RuntimeError: If agent instance not found or micro-task execution fails
@@ -301,13 +301,11 @@ except Exception as e:
     except Exception as e:
         raise RuntimeError(f"Failed to run agent: {e}") from e
     
-    # Collect and return the output
-    full_output = ""
+    # Yield output chunks as they come
     for chunk in result.output:
         chunk_str = chunk.decode() if isinstance(chunk, bytes) else str(chunk)
-        full_output += chunk_str
-    
-    return full_output.strip()
+        if chunk_str.strip():  # Only yield non-empty chunks
+            yield chunk_str
 
 def cleanup_agent(name: str) -> None:
     """

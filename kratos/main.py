@@ -5,6 +5,7 @@ from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
 from microvm import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
+from typing import Iterator
 
 
 def submit(agent: Agent, name: str) -> str:
@@ -17,12 +18,13 @@ def submit(agent: Agent, name: str) -> str:
         return f"Failed: {e}"
 
 
-def invoke(name: str, task: str) -> str:
-    """Run a task on an agent."""
+def invoke(name: str, task: str) -> Iterator[str]:
+    """Run a task on an agent and yield results as they come."""
     try:
-        return invoke_agent(name, task)
+        for response in invoke_agent(name, task):
+            yield response
     except Exception as e:
-        return f"Failed: {e}"
+        yield f"Failed: {e}"
 
 
 def remove(name: str) -> str:
@@ -55,18 +57,20 @@ if __name__ == "__main__":
     print("=" * 45)
     
     # Deploy
+    print("🔄 Building and submitting agent...")
     agent = create_agent()
     print(f"🚀 {submit(agent, 'kratos')}")
     
     # Tasks
-    tasks = [
-        "Search the web for the current stock price of Apple (AAPL) and tell me if it's a good investment", 
-        "Find recent news about Tesla and summarize the key developments", 
-        "Get the transcript of this YouTube video: https://www.youtube.com/watch?v=dQw4w9WgXcQ and summarize it"
-    ]
-    for i, task in enumerate(tasks, 1):
-        print(f"\n⚡ {i}: {task}")
-        print(f"💬 {invoke('kratos', task)}")
+    task = "Search the web for the current stock price of Apple (AAPL) and tell me if it's a good investment"
+    print(f"\n⚡ Task: {task}")
+    print("💬 Response:")
+    
+    # Stream the response as it comes
+    for response_chunk in invoke('kratos', task):
+        print(response_chunk, end='', flush=True)
+    
+    print()  # New line after streaming is complete
     
     # Cleanup
     print(f"\n💰 {remove('kratos')}")
