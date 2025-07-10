@@ -13,5 +13,5 @@ def run(name: str, instruction: str) -> str:
 
 
 if __name__ == "__main__":
-    bootstrap("test-agent", cloudpickle.dumps("coco"))
+    # bootstrap("test-agent", cloudpickle.dumps("coco"))
     run_agent("test-agent", "samplabiley")

@@ -12,33 +12,50 @@ client = docker.from_env()
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
     
+    # Clean up any existing container with the same name
+    try:
+        existing_container = client.containers.get(name)
+        existing_container.stop()
+        existing_container.remove()
+    except docker.errors.NotFound:  # pyright: ignore
+        pass  # Container doesn't exist, which is fine
+    
     # Start the ollama container
     container = client.containers.create(name=name, image="ollama/ollama", command="serve", detach=True)
     container.start()
     
-    # Install curl and upgrade packages
-    container.exec_run("apt update && apt upgrade -y && apt install -y curl", workdir="/")
-    
-    # Install uv
-    container.exec_run("curl -LsSf https://astral.sh/uv/install.sh | sh", workdir="/")
-    
-    # Add uv to PATH
-    container.exec_run("echo 'export PATH=/root/.local/bin:$PATH' >> /root/.bashrc", workdir="/")
-    
-    # Initialize uv project
-    container.exec_run("export PATH=/root/.local/bin:$PATH && uv init", workdir="/")
-    
-    # Install default dependencies from bootstrap.sh
     default_deps = ["ollama", "agno", "cloudpickle"]
-    
-    # Combine default dependencies with any additional ones passed
     all_deps = default_deps.copy()
     if dependencies:
         all_deps.extend(dependencies)
     
     # Install all dependencies
     deps_str = " ".join(all_deps)
-    container.exec_run(f"export PATH=/root/.local/bin:$PATH && uv add {deps_str}", workdir="/")
+
+    # Create working directory first
+    res = container.exec_run("mkdir -p /workdir")
+    if res.exit_code != 0:
+        print("Failed to create workdir:", res.output)
+
+    # Install system dependencies
+    res = container.exec_run(["/bin/bash", "-c", "apt update && apt upgrade -y && apt install -y curl"])
+    if res.exit_code != 0:
+        print("Failed to install system dependencies:", res.output)
+
+    # Install uv
+    res = container.exec_run(["/bin/bash", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"])
+    if res.exit_code != 0:
+        print("Failed to install uv:", res.output)
+
+    # Initialize uv project in workdir
+    res = container.exec_run(["/bin/bash", "-c", "/root/.local/bin/uv init"], workdir="/workdir")
+    if res.exit_code != 0:
+        print("Failed to initialize uv project:", res.output)
+
+    # Add dependencies
+    res = container.exec_run(["/bin/bash", "-c", f"/root/.local/bin/uv add {deps_str}"], workdir="/workdir")
+    if res.exit_code != 0:
+        print("Failed to add dependencies:", res.output)
     
     # Create agent.pkl file with the serialized agent
     # Create a tar archive in memory containing the agent.pkl file
@@ -90,7 +107,7 @@ print()
 '''
     
     # Execute the Python script in the container and capture output
-    result = container.exec_run(f'export PATH=/root/.local/bin:$PATH && uv run python -c "{python_script}"', workdir="/", stream=True)
+    result = container.exec_run(["/bin/bash", "-c", f'/root/.local/bin/uv run python -c "{python_script}"'], workdir="/workdir", stream=True)
     
     # Stream the output in real-time
     full_output = ""
