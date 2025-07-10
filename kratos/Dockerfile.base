@@ -1,19 +1,23 @@
-FROM ollama/ollama
+FROM ghcr.io/astral-sh/uv:debian-slim
 
-# Install system dependencies in one layer
-RUN apt update && apt upgrade -y && apt install -y curl && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    wget \
+    coreutils \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Add uv to PATH
-ENV PATH="/root/.local/bin:$PATH"
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
 
 # Create working directory
 RUN mkdir -p /workdir
 WORKDIR /workdir
 
 # Initialize uv project and install common dependencies
+# uv is already installed in the base image
 RUN uv init
 RUN uv add ollama agno cloudpickle
 
@@ -21,4 +25,4 @@ RUN uv add ollama agno cloudpickle
 RUN uv add ddgs duckduckgo-search yfinance youtube-transcript-api
 
 # Set the default command to serve ollama
-CMD ["serve"]
+CMD ["ollama", "serve"]

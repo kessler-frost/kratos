@@ -282,7 +282,7 @@ def invoke_agent(name: str, instructions: str) -> Iterator[str]:
             container = client.containers.create(
                 name=container_name, 
                 image=agent_image_name, 
-                command="serve", 
+                command=["ollama", "serve"], 
                 detach=True
             )
             container.start()
@@ -339,7 +339,7 @@ except Exception as e:
         start_time = time.time()
         
         # Execute with streaming
-        exec_result = container.exec_run(["/bin/bash", "-c", f'/root/.local/bin/uv run python /run_agent.py "{instructions}"'], workdir=WORKDIR, stream=True)
+        exec_result = container.exec_run(["/bin/bash", "-c", f'/usr/local/bin/uv run python /run_agent.py "{instructions}"'], workdir=WORKDIR, stream=True)
         
         # Yield output chunks as they come with timeout enforcement
         for chunk in exec_result.output:

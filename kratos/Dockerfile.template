@@ -10,4 +10,4 @@ FROM kratos-base:latest
 COPY agent.pkl /workdir/agent.pkl
 
 # Set the default command to serve ollama
-CMD ["serve"]
+CMD ["ollama", "serve"]

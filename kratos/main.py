@@ -71,37 +71,37 @@ def create_youtube_agent(model: str) -> Agent:
 
 if __name__ == "__main__":
     import time
-    
+
     print("🚀 Kratos: Serverless Intelligence Platform")
     print("=" * 45)
 
-    # Create and deploy a single test agent
-    print("🔄 Building and submitting test agent...")
-    
-    test_agent = create_web_search_agent("qwen3:1.7b")
-    print(f"🚀 {submit(test_agent, 'test-agent')}")
+    # # Create and deploy a single test agent
+    # print("🔄 Building and submitting test agent...")
+
+    # test_agent = create_web_search_agent("qwen3:1.7b")
+    # print(f"🚀 {submit(test_agent, 'test-agent')}")
 
     # Test single execution
     print("\n" + "="*50)
     print("🧪 Testing Agent Execution")
     print("="*50)
-    
+
     task = "Hello, please introduce yourself and tell me what you can do."
     print(f"⚡ Task: {task}")
     print("💬 Response:")
-    
+
     # Measure execution time
     start_time = time.time()
-    
+
     for response_chunk in invoke('test-agent', task):
         print(response_chunk, end='', flush=True)
-    
+
     end_time = time.time()
     execution_time = end_time - start_time
-    
+
     print(f"\n\n⏱️  Execution time: {execution_time:.2f} seconds")
-    
+
     # Cleanup the agent
-    print("\n" + "="*50)
-    print("💰 Cleaning up agent...")
-    print(f"🗑️ {remove('test-agent')}")
+    # print("\n" + "="*50)
+    # print("💰 Cleaning up agent...")
+    # print(f"🗑️ {remove('test-agent')}")
