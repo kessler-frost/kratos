@@ -41,6 +41,105 @@ def _extract_model_id(serialized_agent: bytes) -> Optional[str]:
         return None
 
 
+def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
+    """Validate agent model for Kratos requirements.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    try:
+        import cloudpickle
+        agent = cloudpickle.loads(serialized_agent)
+        
+        # Check if model provider is Ollama
+        model_type = type(agent.model).__name__
+        if model_type != 'Ollama':
+            return False, f"Kratos only supports Ollama models for efficient local compute. Found: {model_type}"
+        
+        return True, ""
+    except Exception as e:
+        return False, f"Failed to validate agent model: {e}"
+
+
+def _check_model_size(model_id: str, container) -> tuple[bool, str]:
+    """Check if model size is within Kratos limits (< 6GB).
+    
+    Pulls the model and checks its actual size for efficiency and optimization.
+    
+    Returns:
+        tuple: (is_valid, error_message_or_size)
+    """
+    try:
+        # Pull the model to get accurate size information (with timeout for large models)
+        pull_result = container.exec_run(["/bin/bash", "-c", f"timeout 30s ollama pull {model_id}"])
+        if pull_result.exit_code != 0:
+            pull_output = pull_result.output.decode() if pull_result.output else ""
+            if "timeout" in pull_output.lower() or pull_result.exit_code == 124:
+                return False, f"Model {model_id} pull timed out (likely >6GB). Kratos supports models ≤6GB for efficiency and optimization reasons."
+            elif "not found" in pull_output.lower():
+                return False, f"Model {model_id} not found in Ollama registry."
+            else:
+                return False, f"Failed to pull model {model_id}: {pull_output}"
+        
+        # Get the actual model size using ollama show
+        result = container.exec_run(["/bin/bash", "-c", f"ollama show {model_id} | grep -i 'size\|parameters' || ollama list | grep '{model_id}'"])
+        
+        if result.exit_code == 0:
+            output = result.output.decode().strip()
+            
+            # Try to extract size from ollama list output (more reliable)
+            list_result = container.exec_run(["/bin/bash", "-c", f"ollama list | grep '{model_id}' | head -1"])
+            if list_result.exit_code == 0:
+                list_output = list_result.output.decode().strip()
+                if list_output:
+                    # Parse ollama list format: NAME    ID    SIZE    MODIFIED
+                    parts = list_output.split()
+                    if len(parts) >= 3:
+                        size_str = parts[2]  # Third column is size
+                        try:
+                            size_gb = _parse_size_to_gb(size_str)
+                            if size_gb > 6.0:
+                                return False, f"Model {model_id} size ({size_str}) exceeds 6GB limit. Kratos supports models ≤6GB for efficiency and optimization."
+                            else:
+                                return True, f"Model size: {size_str}"
+                        except ValueError:
+                            # If we can't parse the size, allow it but warn
+                            return True, f"Model size: {size_str} (format not recognized, proceeding)"
+        
+        # If we can't determine size, allow it but warn
+        return True, "Model size: unknown (proceeding)"
+        
+    except Exception as e:
+        return False, f"Failed to check model size: {e}"
+
+
+def _parse_size_to_gb(size_str: str) -> float:
+    """Parse size string to GB for comparison."""
+    import re
+    
+    size_str = size_str.strip().upper()
+    
+    # Extract number and unit
+    match = re.match(r'([0-9.]+)\s*([A-Z]*)', size_str)
+    if not match:
+        raise ValueError(f"Cannot parse size: {size_str}")
+    
+    value = float(match.group(1))
+    unit = match.group(2) if match.group(2) else 'B'
+    
+    # Convert to GB
+    if unit == 'GB':
+        return value
+    elif unit == 'MB':
+        return value / 1024
+    elif unit == 'KB':
+        return value / (1024 * 1024)
+    elif unit == 'B':
+        return value / (1024 * 1024 * 1024)
+    else:
+        raise ValueError(f"Unknown unit: {unit}")
+
+
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
     """
     Bootstrap a lightweight, ephemeral agent for serverless micro-task execution.
@@ -57,6 +156,11 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
         RuntimeError: If serverless agent bootstrap fails
     """
     
+    # Validate agent model requirements for Kratos
+    is_valid, error_msg = _validate_agent_model(serialized_agent)
+    if not is_valid:
+        raise RuntimeError(f"Agent validation failed: {error_msg}")
+    
     # Ensure base image exists
     _ensure_base_image_exists()
     
@@ -68,7 +172,7 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     except docker.errors.NotFound:  # pyright: ignore
         pass  # Container doesn't exist, which is fine
     
-    # Create container from base image (don't start yet)
+    # Create container from base image
     try:
         container = client.containers.create(name=name, image=BASE_IMAGE_NAME, command="serve", detach=True)
         container.start()
@@ -80,13 +184,25 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
         deps_str = " ".join(dependencies)
         _exec_command(container, f"uv add {deps_str}")
     
-    # Pull the specific model that the agent requires
+    # Validate and pull the specific model that the agent requires
     model_id = _extract_model_id(serialized_agent)
     if model_id:
         try:
-            _exec_command(container, f"ollama pull {model_id}")
+            # Check model size before allowing deployment
+            size_valid, size_msg = _check_model_size(model_id, container)
+            if not size_valid:
+                # Clean up container before failing
+                container.stop()
+                container.remove()
+                raise RuntimeError(f"Model validation failed: {size_msg}")
         except RuntimeError:
-            pass  # Model pulling failed, agent may fail if model not available
+            # Clean up container on any model-related failure
+            try:
+                container.stop()
+                container.remove()
+            except:
+                pass
+            raise
     
     # Create agent.pkl file with the serialized agent
     # Write the serialized agent to a file using base64 encoding to handle binary data
