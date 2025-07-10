@@ -36,10 +36,10 @@ def remove(name: str) -> str:
         return f"Failed: {e}"
 
 
-def create_web_search_agent() -> Agent:
+def create_web_search_agent(model: str) -> Agent:
     """Create a Kratos agent specialized for web search."""
     return Agent(
-        model=Ollama(id="qwen3:1.7b"),
+        model=Ollama(id=model),
         name="KratosWebSearch",
         tools=[DuckDuckGoTools()],
         instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
@@ -47,10 +47,10 @@ def create_web_search_agent() -> Agent:
     )
 
 
-def create_finance_agent() -> Agent:
+def create_finance_agent(model: str) -> Agent:
     """Create a Kratos agent specialized for financial data."""
     return Agent(
-        model=Ollama(id="qwen3:1.7b"),
+        model=Ollama(id=model),
         name="KratosFinance",
         tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True)],
         instructions="You are Kratos Finance Agent, specialized in stock market analysis and financial data. Use YFinance to get current stock prices, analyst recommendations, and company information. When users ask about stocks, always provide current prices and relevant financial metrics. Be precise with numbers and explain what the data means for investment decisions.",
@@ -58,10 +58,10 @@ def create_finance_agent() -> Agent:
     )
 
 
-def create_youtube_agent() -> Agent:
+def create_youtube_agent(model: str) -> Agent:
     """Create a Kratos agent specialized for YouTube analysis."""
     return Agent(
-        model=Ollama(id="qwen3:1.7b"),
+        model=Ollama(id=model),
         name="KratosYouTube",
         tools=[YouTubeTools()],
         instructions="You are Kratos YouTube Agent, specialized in analyzing YouTube videos and transcripts. Use YouTube tools to extract video information, transcripts, and analyze content. When users mention YouTube videos, provide detailed analysis of the content, key points, and insights from the transcript. Be thorough in your analysis and highlight important information.",
@@ -76,13 +76,13 @@ if __name__ == "__main__":
     # Deploy three specialized agents
     print("🔄 Building and submitting agents...")
 
-    web_agent = create_web_search_agent()
+    web_agent = create_web_search_agent("qwen3:1.7b")
     print(f"🚀 {submit(web_agent, 'kratos-1')}")
 
-    finance_agent = create_finance_agent()
+    finance_agent = create_finance_agent("qwen3:1.7b")
     print(f"🚀 {submit(finance_agent, 'kratos-2')}")
 
-    youtube_agent = create_youtube_agent()
+    youtube_agent = create_youtube_agent("qwen3:1.7b")
     print(f"🚀 {submit(youtube_agent, 'kratos-3')}")
 
     # Test each agent with specialized tasks
