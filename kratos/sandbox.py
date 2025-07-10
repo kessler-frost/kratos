@@ -11,12 +11,27 @@ from typing import Optional, List, Iterator
 
 # Configuration
 client = docker.from_env()
+BASE_IMAGE_NAME = "kratos-base"
 AGENT_FILE_PATH = "/agent.pkl"
 WORKDIR = "/workdir"
 MODEL_SIZE_LIMIT_GB = 6.0
-MODEL_PULL_TIMEOUT = 30
+MODEL_PULL_TIMEOUT = 120  # 2 minutes max for model pulls
+CONTAINER_EXECUTION_TIMEOUT = 300  # 5 minutes max for container execution
+BUILD_TIMEOUT = 600  # 10 minutes max for image builds
 
 
+
+def _ensure_optimized_base_image() -> None:
+    """Build the optimized base image if it doesn't exist."""
+    try:
+        client.images.get(BASE_IMAGE_NAME)
+    except docker.errors.ImageNotFound:  # pyright: ignore
+        try:
+            dockerfile_path = os.path.join(os.path.dirname(__file__), "Dockerfile.base")
+            build_path = os.path.dirname(__file__)
+            client.images.build(path=build_path, dockerfile=dockerfile_path, tag=BASE_IMAGE_NAME, rm=True, timeout=BUILD_TIMEOUT)
+        except Exception as e:
+            raise RuntimeError(f"Failed to build optimized base image: {e}") from e
 
 
 def _exec_command(container, command: str, workdir: str = WORKDIR) -> None:
@@ -167,6 +182,9 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     except docker.errors.ImageNotFound:  # pyright: ignore
         pass  # Image doesn't exist, which is fine
     
+    # Ensure optimized base image exists
+    _ensure_optimized_base_image()
+    
     # Build custom image with dependencies and model baked in
     _build_agent_image(agent_image_name, serialized_agent, dependencies, model_id)
 
@@ -187,18 +205,24 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         with open(template_path, 'r') as f:
             dockerfile_content = f.read()
         
-        # Prepare dependencies installation command
+        # Prepare additional dependencies installation command (most common ones are pre-installed)
         if dependencies:
-            deps_str = " ".join(dependencies)
-            dependencies_install = f"RUN uv add {deps_str}"
+            # Filter out already installed dependencies
+            common_deps = {"ddgs", "duckduckgo-search", "yfinance", "youtube-transcript-api"}
+            additional_deps = [dep for dep in dependencies if dep not in common_deps]
+            if additional_deps:
+                deps_str = " ".join(additional_deps)
+                dependencies_install = f"RUN uv add {deps_str}"
+            else:
+                dependencies_install = "# All dependencies already installed in base image"
         else:
             dependencies_install = "# No additional dependencies"
         
-        # Prepare model pull command
+        # Prepare model pull command with timeout
         if model_id:
             model_pull = f"""RUN nohup ollama serve > /dev/null 2>&1 & \\
     sleep 10 && \\
-    ollama pull {model_id} && \\
+    timeout {MODEL_PULL_TIMEOUT} ollama pull {model_id} && \\
     pkill -f ollama"""
         else:
             model_pull = "# No model to pull"
@@ -217,9 +241,9 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         with open(agent_path, 'wb') as f:
             f.write(serialized_agent)
         
-        # Build the custom image
+        # Build the custom image with timeout
         try:
-            client.images.build(path=temp_dir, tag=image_name, rm=True)
+            client.images.build(path=temp_dir, tag=image_name, rm=True, timeout=BUILD_TIMEOUT)
         except Exception as e:
             raise RuntimeError(f"Failed to build agent image: {e}") from e
 
@@ -308,11 +332,26 @@ except Exception as e:
         script_content_b64 = base64.b64encode(python_script.encode('utf-8')).decode('utf-8')
         _exec_command(container, f'echo "{script_content_b64}" | base64 -d > /run_agent.py', workdir="/")
         
-        # Execute the Python script with instructions as argument
-        result = container.exec_run(["/bin/bash", "-c", f'/root/.local/bin/uv run python /run_agent.py "{instructions}"'], workdir=WORKDIR, stream=True)
+        # Execute the Python script with instructions as argument and timeout
+        import threading
+        import time
         
-        # Yield output chunks as they come
-        for chunk in result.output:
+        start_time = time.time()
+        
+        # Execute with streaming
+        exec_result = container.exec_run(["/bin/bash", "-c", f'/root/.local/bin/uv run python /run_agent.py "{instructions}"'], workdir=WORKDIR, stream=True)
+        
+        # Yield output chunks as they come with timeout enforcement
+        for chunk in exec_result.output:
+            # Check if we've exceeded the timeout
+            if time.time() - start_time > CONTAINER_EXECUTION_TIMEOUT:
+                # Kill the container if it's taking too long
+                try:
+                    container.kill()
+                except:
+                    pass
+                raise RuntimeError(f"Container execution timeout exceeded ({CONTAINER_EXECUTION_TIMEOUT} seconds)")
+            
             chunk_str = chunk.decode() if isinstance(chunk, bytes) else str(chunk)
             if chunk_str.strip():  # Only yield non-empty chunks
                 yield chunk_str
@@ -411,7 +450,14 @@ def prune() -> None:
             except Exception:
                 pass  # Ignore individual image cleanup errors
         
-        # No base image to clean up since we use ollama/ollama directly
+        # Also try to remove the optimized base image
+        try:
+            base_image = client.images.get(BASE_IMAGE_NAME)
+            client.images.remove(base_image.id, force=True)
+        except docker.errors.ImageNotFound:  # pyright: ignore
+            pass  # Base image doesn't exist, which is fine
+        except Exception:
+            pass  # Ignore base image cleanup errors
             
     except Exception as e:
         raise RuntimeError(f"Failed to prune Kratos resources: {e}") from e
