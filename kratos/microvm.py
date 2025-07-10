@@ -17,7 +17,7 @@ def _ensure_base_image_exists() -> None:
     try:
         client.images.get(BASE_IMAGE_NAME)
         print(f"Base image {BASE_IMAGE_NAME} already exists")
-    except docker.errors.ImageNotFound:
+    except docker.errors.ImageNotFound:  # pyright: ignore
         print(f"Building base image {BASE_IMAGE_NAME}...")
         try:
             client.images.build(path=".", tag=BASE_IMAGE_NAME, rm=True)
@@ -128,7 +128,7 @@ print()
         
         # Execute the Python script in the container and capture output
         result = container.exec_run(["/bin/bash", "-c", f'/root/.local/bin/uv run python -c "{python_script}"'], workdir=WORKDIR, stream=True)
-    except docker.errors.NotFound:
+    except docker.errors.NotFound:  # pyright: ignore
         raise RuntimeError(f"Agent container '{name}' not found. Did you run bootstrap first?") from None
     except Exception as e:
         raise RuntimeError(f"Failed to run agent: {e}") from e
@@ -165,7 +165,7 @@ def cleanup_agent(name: str) -> None:
         container.stop()
         container.remove()
         print(f"Agent container {name} cleaned up successfully")
-    except docker.errors.NotFound:
+    except docker.errors.NotFound:  # pyright: ignore
         print(f"Agent container {name} not found")
     except Exception as e:
         raise RuntimeError(f"Failed during cleanup of container {name}: {e}") from e
