@@ -1,5 +1,6 @@
-# Using docker for now, but this can be easily replaced with a microvm library.
-# Apple's Containers actually use microvms under the hood but a release for the latest MacOS is not available yet.
+# Kratos: Serverless compute platform for ephemeral agents
+# Currently using Docker containers, but will migrate to native Apple Containers
+# when they become available on the latest macOS for better performance per watt.
 
 import base64
 import docker
@@ -42,15 +43,18 @@ def _extract_model_id(serialized_agent: bytes) -> Optional[str]:
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
     """
-    Bootstrap an ephemeral agent container with the given name and serialized agent.
+    Bootstrap a lightweight, ephemeral agent for serverless micro-task execution.
+    
+    Creates an isolated, fast-launching environment similar to cloud functions,
+    ready to handle micro-tasks like search, parsing, editing, or content generation.
     
     Args:
-        name: Unique name for the ephemeral agent container
-        serialized_agent: Cloudpickle-serialized agent object
-        dependencies: Optional list of additional Python packages to install
+        name: Unique identifier for the ephemeral agent instance
+        serialized_agent: Cloudpickle-serialized agent ready for micro-task execution
+        dependencies: Optional list of additional Python packages for specialized tasks
         
     Raises:
-        RuntimeError: If ephemeral container creation, dependency installation, or agent setup fails
+        RuntimeError: If serverless agent bootstrap fails
     """
     
     # Ensure base image exists
@@ -95,21 +99,24 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
 
 def invoke_agent(name: str, instructions: str) -> str:
     """
-    Run the ephemeral agent with the given instructions in the existing container.
+    Execute a micro-task on a serverless ephemeral agent.
+    
+    Invokes the agent to handle lightweight tasks like search, parsing, editing,
+    or content generation. Designed for burst execution patterns with minimal overhead.
     
     Args:
-        name: Name of the ephemeral agent container (must be bootstrapped first)
-        instructions: Instructions to pass to the ephemeral agent
+        name: Identifier of the ephemeral agent instance
+        instructions: Micro-task instructions for the agent to execute
         
     Returns:
-        Complete output from the ephemeral agent execution
+        Task execution result from the ephemeral agent
         
     Raises:
-        RuntimeError: If ephemeral container is not found or execution fails
+        RuntimeError: If agent instance not found or micro-task execution fails
         
     Note:
-        This is designed to be called multiple times after bootstrap (Lambda-style).
-        The ephemeral container stays running between calls for performance.
+        Optimized for per-second billing with strict memory/CPU limits.
+        Agent stays warm between invocations for efficiency.
     """
     try:
         # Get the container by name
@@ -173,13 +180,16 @@ except Exception as e:
 
 def cleanup_agent(name: str) -> None:
     """
-    Stop and remove the ephemeral agent container.
+    Teardown serverless agent instance and reclaim resources.
+    
+    Immediately shuts down the ephemeral agent and frees all allocated
+    memory/CPU resources. Part of the per-second billing model.
     
     Args:
-        name: Name of the ephemeral agent container to cleanup
+        name: Identifier of the ephemeral agent instance to teardown
         
     Raises:
-        RuntimeError: If cleanup fails (container not found is handled gracefully)
+        RuntimeError: If teardown fails (missing instance handled gracefully)
     """
     try:
         container = client.containers.get(name)

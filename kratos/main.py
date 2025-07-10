@@ -7,87 +7,96 @@ import cloudpickle
 
 def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
     """
-    Submit an ephemeral agent for deployment (Lambda-style).
+    Deploy a serverless agent for micro-task execution.
+    
+    Creates a lightweight, isolated environment optimized for burst workloads
+    and per-second billing. Ideal for tasks like search, parsing, editing, and content generation.
     
     Args:
-        agent: The Agno agent to deploy as ephemeral container
-        name: Unique name for the ephemeral agent deployment
-        dependencies: Optional list of additional Python packages
+        agent: The agent configured for micro-task execution
+        name: Unique identifier for the serverless agent instance
+        dependencies: Optional packages for specialized micro-tasks
         
     Returns:
-        Ephemeral deployment identifier/status
+        Deployment status of the serverless agent
     """
     try:
         bootstrap(name, cloudpickle.dumps(agent), dependencies)
-        return f"Ephemeral agent deployed: {name}"
+        return f"Serverless agent deployed: {name}"
     except Exception as e:
-        return f"Failed to deploy ephemeral agent '{name}': {e}"
+        return f"Failed to deploy serverless agent '{name}': {e}"
 
 
 def invoke(name: str, instruction: str) -> str:
     """
-    Invoke an ephemeral agent with instructions (Lambda-style).
+    Execute a micro-task on a serverless agent.
+    
+    Designed for burst execution with per-second billing efficiency.
+    Handles lightweight tasks with minimal overhead and strict resource limits.
     
     Args:
-        name: Name of the ephemeral agent
-        instruction: Instructions to send to the ephemeral agent
+        name: Identifier of the serverless agent instance
+        instruction: Micro-task instruction for execution
         
     Returns:
-        Ephemeral agent response
+        Micro-task execution result
     """
     try:
         return invoke_agent(name, instruction)
     except Exception as e:
-        return f"Failed to invoke ephemeral agent '{name}': {e}"
+        return f"Failed to execute micro-task on agent '{name}': {e}"
 
 
 def remove(name: str) -> str:
     """
-    Destroy an ephemeral agent (Lambda-style cleanup).
+    Teardown serverless agent and reclaim resources.
+    
+    Immediately frees all allocated memory/CPU resources as part of
+    the per-second billing model. Ensures efficient resource utilization.
     
     Args:
-        name: Name of the ephemeral agent to destroy
+        name: Identifier of the serverless agent to teardown
         
     Returns:
-        Destruction status
+        Resource reclamation status
     """
     try:
         cleanup_agent(name)
-        return f"Ephemeral agent '{name}' destroyed"
+        return f"Serverless agent '{name}' resources reclaimed"
     except Exception as e:
-        return f"Failed to destroy ephemeral agent '{name}': {e}"
+        return f"Failed to teardown agent '{name}': {e}"
 
 
 def create_simple_agent() -> Agent:
-    """Create a simple Agno agent with Ollama and a small model."""
-    # Use a small model (will be pulled during bootstrap if needed)
+    """Create a lightweight agent optimized for micro-task execution."""
+    # Use a small, efficient model for fast inference and energy efficiency
     model = Ollama(id="llama3.2:1b")
     
     return Agent(
         model=model,
-        name="SimpleAgent",
-        description="A simple agent that can answer questions and help with tasks.",
-        instructions="You are a helpful assistant. Keep your responses concise and clear."
+        name="MicroTaskAgent",
+        description="Lightweight agent for serverless micro-tasks: search, parsing, editing, content generation.",
+        instructions="You are an efficient micro-task agent. Provide concise, accurate responses optimized for quick execution."
     )
 
 
 if __name__ == "__main__":
-    agent_name = "ephemeral-agent"
+    agent_name = "micro-task-agent"
     
-    # Create and deploy ephemeral agent
+    # Deploy serverless agent for micro-task execution
     agent = create_simple_agent()
     print(f"🚀 {submit(agent, agent_name)}")
     
-    # Test ephemeral agent invocations
-    test_instructions = [
+    # Execute burst of micro-tasks (typical Kratos workload)
+    micro_tasks = [
         "What is 2+2?",
-        "Tell me a short joke.",
-        "What is the capital of France?"
+        "Generate a 3-word product name for a coffee app",
+        "Extract the domain from: user@example.com"
     ]
     
-    for instruction in test_instructions:
-        print(f"\n❓ {instruction}")
-        print(f"🤖 {invoke(agent_name, instruction)}")
+    for task in micro_tasks:
+        print(f"\n⚡ Micro-task: {task}")
+        print(f"📊 Result: {invoke(agent_name, task)}")
     
-    # Destroy ephemeral agent
-    print(f"\n💥 {remove(agent_name)}")
+    # Teardown and reclaim resources (per-second billing ends)
+    print(f"\n💰 {remove(agent_name)}")

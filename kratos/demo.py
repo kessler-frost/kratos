@@ -1,52 +1,55 @@
 #!/usr/bin/env python3
 """
-Demo script showing Lambda-style ephemeral agent deployment and invocation.
+Kratos Demo: Serverless compute platform for ephemeral agents
 
-This demonstrates the three main operations:
-1. submit() - Deploy an ephemeral agent (like Lambda deployment)
-2. invoke() - Execute the ephemeral agent with instructions (like Lambda invocation)
-3. remove() - Destroy the ephemeral agent
+Demonstrates lightweight, short-lived agents handling micro-tasks like search,
+parsing, editing, and content generation with per-second billing efficiency.
+
+Core operations:
+1. submit() - Deploy serverless agent for micro-task execution
+2. invoke() - Execute micro-tasks with burst efficiency
+3. remove() - Teardown and reclaim resources
 """
 
 from main import submit, invoke, remove, create_simple_agent
 
 
-def demo_lambda_style_agent():
-    """Demonstrate Lambda-style ephemeral agent operations."""
+def demo_kratos_micro_tasks():
+    """Demonstrate Kratos serverless micro-task execution."""
     
-    print("🚀 Kratos Ephemeral Agent Demo - Lambda-style Deployment")
-    print("=" * 55)
+    print("🚀 Kratos Demo - Serverless Micro-Task Platform")
+    print("=" * 50)
     
-    # Step 1: Create an ephemeral agent
-    print("📦 Creating ephemeral agent...")
+    # Step 1: Deploy serverless agent
+    print("📦 Deploying serverless agent for micro-tasks...")
     agent = create_simple_agent()
-    agent_name = "ephemeral-demo-agent"
+    agent_name = "micro-task-demo"
     
-    # Step 2: Submit (deploy) the ephemeral agent
-    print(f"\n🔄 Deploying ephemeral agent '{agent_name}'...")
     deployment_result = submit(agent, agent_name)
     print(f"✅ {deployment_result}")
     
-    # Step 3: Invoke the ephemeral agent multiple times
-    print(f"\n⚡ Invoking ephemeral agent '{agent_name}' with different instructions...")
+    # Step 2: Execute burst of micro-tasks (typical Kratos workload)
+    print(f"\n⚡ Executing burst micro-tasks on '{agent_name}'...")
     
-    test_cases = [
-        "Explain quantum computing in one sentence.",
-        "Write a haiku about programming.",
-        "What's the difference between Docker and virtual machines?"
+    micro_tasks = [
+        "Parse email 'john.doe@company.com' and extract company name",
+        "Generate 5 keywords for a fitness tracking app",
+        "Summarize: 'Q3 revenue grew 23% driven by mobile adoption'",
+        "Convert text 'URGENT_PROJECT_DEADLINE' to title case",
+        "Extract the action item from: 'Please review the proposal by Friday'"
     ]
     
-    for i, instruction in enumerate(test_cases, 1):
-        print(f"\n🎯 Test {i}: {instruction}")
-        response = invoke(agent_name, instruction)
-        print(f"💬 Agent: {response}")
+    for i, task in enumerate(micro_tasks, 1):
+        print(f"\n📊 Micro-task {i}: {task}")
+        response = invoke(agent_name, task)
+        print(f"🚀 Result: {response}")
     
-    # Step 4: Clean up
-    print(f"\n🧹 Removing agent '{agent_name}'...")
+    # Step 3: Teardown and reclaim resources
+    print(f"\n💰 Tearing down agent '{agent_name}' and reclaiming resources...")
     removal_result = remove(agent_name)
     print(f"✅ {removal_result}")
     
-    print("\n🎉 Demo completed successfully!")
+    print("\n🎉 Kratos micro-task demo completed!")
 
 
 def demo_multiple_agents():
@@ -85,7 +88,7 @@ def demo_multiple_agents():
 
 if __name__ == "__main__":
     try:
-        demo_lambda_style_agent()
+        demo_kratos_micro_tasks()
         demo_multiple_agents()
     except KeyboardInterrupt:
         print("\n\n🛑 Demo interrupted by user")
