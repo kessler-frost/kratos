@@ -4,27 +4,19 @@
 
 import base64
 import docker
+import os
+import tempfile
 from typing import Optional, List, Iterator
 
 
 # Configuration
 client = docker.from_env()
-BASE_IMAGE_NAME = "kratos-agent-base"
 AGENT_FILE_PATH = "/agent.pkl"
 WORKDIR = "/workdir"
 MODEL_SIZE_LIMIT_GB = 6.0
 MODEL_PULL_TIMEOUT = 30
 
 
-def _ensure_base_image_exists() -> None:
-    """Build the base image if it doesn't exist."""
-    try:
-        client.images.get(BASE_IMAGE_NAME)
-    except docker.errors.ImageNotFound:  # pyright: ignore
-        try:
-            client.images.build(path=".", tag=BASE_IMAGE_NAME, rm=True)
-        except Exception as e:
-            raise RuntimeError(f"Failed to build base image: {e}") from e
 
 
 def _exec_command(container, command: str, workdir: str = WORKDIR) -> None:
@@ -164,86 +156,114 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     if not is_valid:
         raise RuntimeError(f"Agent validation failed: {error_msg}")
     
-    # Ensure base image exists
-    _ensure_base_image_exists()
-    
-    # Clean up any existing container with the same name
-    try:
-        existing_container = client.containers.get(name)
-        existing_container.stop()
-        existing_container.remove()
-    except docker.errors.NotFound:  # pyright: ignore
-        pass  # Container doesn't exist, which is fine
-    
-    # Create container from base image
-    try:
-        container = client.containers.create(name=name, image=BASE_IMAGE_NAME, command="serve", detach=True)
-        container.start()
-    except Exception as e:
-        raise RuntimeError(f"Failed to create or start container: {e}") from e
-    
-    # Install additional dependencies if specified
-    if dependencies:
-        deps_str = " ".join(dependencies)
-        _exec_command(container, f"uv add {deps_str}")
-    
-    # Validate and pull the specific model that the agent requires
+    # Extract model ID for later use in the image build
     model_id = _extract_model_id(serialized_agent)
-    if model_id:
+    
+    # Clean up any existing image with the same name
+    agent_image_name = f"kratos-agent-{name}"
+    try:
+        existing_image = client.images.get(agent_image_name)
+        client.images.remove(existing_image.id, force=True)
+    except docker.errors.ImageNotFound:  # pyright: ignore
+        pass  # Image doesn't exist, which is fine
+    
+    # Build custom image with dependencies and model baked in
+    _build_agent_image(agent_image_name, serialized_agent, dependencies, model_id)
+
+
+def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None, model_id: Optional[str] = None) -> None:
+    """
+    Build a custom Docker image with dependencies and model baked in.
+    
+    Args:
+        image_name: Name for the custom image
+        serialized_agent: Cloudpickle-serialized agent
+        dependencies: Optional list of additional Python packages
+        model_id: Optional model ID to pull into the image
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Read the Dockerfile template
+        template_path = os.path.join(os.path.dirname(__file__), "Dockerfile.template")
+        with open(template_path, 'r') as f:
+            dockerfile_content = f.read()
+        
+        # Prepare dependencies installation command
+        if dependencies:
+            deps_str = " ".join(dependencies)
+            dependencies_install = f"RUN uv add {deps_str}"
+        else:
+            dependencies_install = "# No additional dependencies"
+        
+        # Prepare model pull command
+        if model_id:
+            model_pull = f"""RUN nohup ollama serve > /dev/null 2>&1 & \\
+    sleep 10 && \\
+    ollama pull {model_id} && \\
+    pkill -f ollama"""
+        else:
+            model_pull = "# No model to pull"
+        
+        # Replace template placeholders
+        dockerfile_content = dockerfile_content.replace("{{DEPENDENCIES_INSTALL}}", dependencies_install)
+        dockerfile_content = dockerfile_content.replace("{{MODEL_PULL}}", model_pull)
+        
+        # Write the customized Dockerfile
+        dockerfile_path = os.path.join(temp_dir, "Dockerfile")
+        with open(dockerfile_path, 'w') as f:
+            f.write(dockerfile_content)
+        
+        # Write the serialized agent to agent.pkl
+        agent_path = os.path.join(temp_dir, "agent.pkl")
+        with open(agent_path, 'wb') as f:
+            f.write(serialized_agent)
+        
+        # Build the custom image
         try:
-            # Check model size before allowing deployment
-            size_valid, size_msg = _check_model_size(model_id, container)
-            if not size_valid:
-                # Clean up container before failing
-                container.stop()
-                container.remove()
-                raise RuntimeError(f"Model validation failed: {size_msg}")
-        except RuntimeError:
-            # Clean up container on any model-related failure
-            try:
-                container.stop()
-                container.remove()
-            except:
-                pass
-            raise
-    
-    # Create agent.pkl file with the serialized agent
-    # Write the serialized agent to a file using base64 encoding to handle binary data
-    encoded_agent = base64.b64encode(serialized_agent).decode('utf-8')
-    _exec_command(container, f'echo "{encoded_agent}" | base64 -d > {AGENT_FILE_PATH}', workdir="/")
-    
-    # Stop the container
-    container.stop()
+            client.images.build(path=temp_dir, tag=image_name, rm=True)
+        except Exception as e:
+            raise RuntimeError(f"Failed to build agent image: {e}") from e
 
 
 def invoke_agent(name: str, instructions: str) -> Iterator[str]:
     """
     Execute a micro-task on a serverless ephemeral agent.
     
-    Invokes the agent to handle lightweight tasks like search, parsing, editing,
-    or content generation. Designed for burst execution patterns with minimal overhead.
+    Creates a new ephemeral container for each invocation, runs the task, and cleans up.
+    Designed for true serverless execution with no persistent state.
     
     Args:
-        name: Identifier of the ephemeral agent instance
+        name: Identifier of the agent image to use
         instructions: Micro-task instructions for the agent to execute
         
     Yields:
         Task execution result chunks from the ephemeral agent as they are generated
         
     Raises:
-        RuntimeError: If agent instance not found or micro-task execution fails
+        RuntimeError: If agent image not found or micro-task execution fails
         
     Note:
-        Optimized for per-second billing with strict memory/CPU limits.
-        Agent stays warm between invocations for efficiency.
+        Each invocation creates a fresh container that is automatically cleaned up.
     """
+    # Create ephemeral container from the custom agent image
+    agent_image_name = f"kratos-agent-{name}"
+    container = None
+    
     try:
-        # Get the container by name
-        container = client.containers.get(name)
+        # Generate unique container name for this invocation
+        import uuid
+        container_name = f"kratos-invoke-{name}-{uuid.uuid4().hex[:4]}"
         
-        # Start the container if it's not running
-        if container.status != 'running':
+        # Create and start ephemeral container
+        try:
+            container = client.containers.create(
+                name=container_name, 
+                image=agent_image_name, 
+                command="serve", 
+                detach=True
+            )
             container.start()
+        except docker.errors.ImageNotFound:  # pyright: ignore
+            raise RuntimeError(f"Agent image '{agent_image_name}' not found. Please bootstrap the agent first.")
         
         # Create a Python script to unpickle and run the agent with streaming
         python_script = f'''
@@ -251,7 +271,7 @@ import cloudpickle
 import sys
 
 # Load the agent from the pickle file
-with open('{AGENT_FILE_PATH}', 'rb') as f:
+with open('/workdir/agent.pkl', 'rb') as f:
     agent = cloudpickle.load(f)
 
 # Get instructions from command line argument
@@ -290,35 +310,108 @@ except Exception as e:
         
         # Execute the Python script with instructions as argument
         result = container.exec_run(["/bin/bash", "-c", f'/root/.local/bin/uv run python /run_agent.py "{instructions}"'], workdir=WORKDIR, stream=True)
+        
+        # Yield output chunks as they come
+        for chunk in result.output:
+            chunk_str = chunk.decode() if isinstance(chunk, bytes) else str(chunk)
+            if chunk_str.strip():  # Only yield non-empty chunks
+                yield chunk_str
+                
     except docker.errors.NotFound:  # pyright: ignore
-        raise RuntimeError(f"Agent container '{name}' not found. Did you run bootstrap first?") from None
+        raise RuntimeError(f"Agent image '{agent_image_name}' not found. Did you run bootstrap first?") from None
     except Exception as e:
         raise RuntimeError(f"Failed to run agent: {e}") from e
-    
-    # Yield output chunks as they come
-    for chunk in result.output:
-        chunk_str = chunk.decode() if isinstance(chunk, bytes) else str(chunk)
-        if chunk_str.strip():  # Only yield non-empty chunks
-            yield chunk_str
+    finally:
+        # Always clean up the ephemeral container
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass  # Ignore cleanup errors
 
 def cleanup_agent(name: str) -> None:
     """
-    Teardown serverless agent instance and reclaim resources.
+    Clean up agent image and any remaining containers for a specific agent.
     
-    Immediately shuts down the ephemeral agent and frees all allocated
-    memory/CPU resources. Part of the per-second billing model.
+    Removes the agent's custom image and any leftover containers that might
+    exist from failed invocations.
     
     Args:
-        name: Identifier of the ephemeral agent instance to teardown
+        name: Identifier of the agent to clean up
         
     Raises:
-        RuntimeError: If teardown fails (missing instance handled gracefully)
+        RuntimeError: If cleanup fails
     """
     try:
-        container = client.containers.get(name)
-        container.stop()
-        container.remove()
-    except docker.errors.NotFound:  # pyright: ignore
-        pass  # Container doesn't exist, which is fine
+        # Clean up any remaining containers for this agent
+        containers = client.containers.list(all=True)
+        agent_containers = [c for c in containers if c.name.startswith(f'kratos-invoke-{name}-')]
+        
+        for container in agent_containers:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass  # Ignore individual container cleanup errors
+        
+        # Remove the agent's custom image
+        agent_image_name = f"kratos-agent-{name}"
+        try:
+            image = client.images.get(agent_image_name)
+            client.images.remove(image.id, force=True)
+        except docker.errors.ImageNotFound:  # pyright: ignore
+            pass  # Image doesn't exist, which is fine
+        except Exception as e:
+            raise RuntimeError(f"Failed to remove agent image {agent_image_name}: {e}") from e
+            
     except Exception as e:
-        raise RuntimeError(f"Failed during cleanup of container {name}: {e}") from e
+        raise RuntimeError(f"Failed during cleanup of agent {name}: {e}") from e
+
+
+def prune() -> None:
+    """
+    Clean up all Kratos-related containers and images.
+    
+    Removes all containers and images created by Kratos to free up system resources.
+    This includes:
+    - All kratos-agent-* images
+    - All kratos-invoke-* containers (ephemeral execution containers)
+    - The kratos-agent-base image
+    
+    Raises:
+        RuntimeError: If cleanup fails
+    """
+    try:
+        # Remove all Kratos containers (both running and stopped)
+        containers = client.containers.list(all=True)
+        kratos_containers = [c for c in containers if c.name.startswith('kratos-')]
+        
+        for container in kratos_containers:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass  # Ignore individual container cleanup errors
+        
+        # Remove all Kratos images
+        images = client.images.list()
+        kratos_images = []
+        
+        for image in images:
+            if image.tags:
+                for tag in image.tags:
+                    if tag.startswith('kratos-'):
+                        kratos_images.append(image)
+                        break
+        
+        for image in kratos_images:
+            try:
+                client.images.remove(image.id, force=True)
+            except Exception:
+                pass  # Ignore individual image cleanup errors
+        
+        # No base image to clean up since we use ollama/ollama directly
+            
+    except Exception as e:
+        raise RuntimeError(f"Failed to prune Kratos resources: {e}") from e

@@ -18,5 +18,14 @@ WORKDIR /workdir
 RUN uv init
 RUN uv add ollama agno cloudpickle
 
+# Install additional dependencies if specified
+{{DEPENDENCIES_INSTALL}}
+
+# Pull the specific model required by the agent
+{{MODEL_PULL}}
+
+# Copy the serialized agent
+COPY agent.pkl /workdir/agent.pkl
+
 # Set the default command to serve ollama
 CMD ["serve"]

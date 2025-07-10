@@ -3,7 +3,7 @@ from agno.models.ollama import Ollama
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
-from kratos.sandbox import bootstrap, invoke_agent, cleanup_agent
+from sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
 from typing import Iterator
 
@@ -73,52 +73,26 @@ if __name__ == "__main__":
     print("🚀 Kratos: Serverless Intelligence Platform")
     print("=" * 45)
 
-    # Deploy three specialized agents
-    print("🔄 Building and submitting agents...")
+    # Create and deploy a single test agent
+    print("🔄 Building and submitting test agent...")
 
-    web_agent = create_web_search_agent("qwen3:1.7b")
-    print(f"🚀 {submit(web_agent, 'kratos-1')}")
+    test_agent = create_web_search_agent("qwen3:1.7b")
+    print(f"🚀 {submit(test_agent, 'test-agent')}")
 
-    finance_agent = create_finance_agent("qwen3:1.7b")
-    print(f"🚀 {submit(finance_agent, 'kratos-2')}")
-
-    youtube_agent = create_youtube_agent("qwen3:1.7b")
-    print(f"🚀 {submit(youtube_agent, 'kratos-3')}")
-
-    # Test each agent with specialized tasks
+    # Test the agent with a simple task
     print("\n" + "="*50)
-    print("🧪 Testing Web Search Agent (kratos-1)")
+    print("🧪 Testing Agent")
     print("="*50)
-    web_task = "Search for the latest news about artificial intelligence breakthroughs in 2024"
-    print(f"⚡ Task: {web_task}")
+
+    task = "Hello, please introduce yourself and tell me what you can do."
+    print(f"⚡ Task: {task}")
     print("💬 Response:")
-    for response_chunk in invoke('kratos-1', web_task):
+
+    for response_chunk in invoke('test-agent', task):
         print(response_chunk, end='', flush=True)
     print()
 
+    # Cleanup the agent
     print("\n" + "="*50)
-    print("🧪 Testing Finance Agent (kratos-2)")
-    print("="*50)
-    finance_task = "Get the current stock price of Tesla (TSLA) and analyst recommendations"
-    print(f"⚡ Task: {finance_task}")
-    print("💬 Response:")
-    for response_chunk in invoke('kratos-2', finance_task):
-        print(response_chunk, end='', flush=True)
-    print()
-
-    print("\n" + "="*50)
-    print("🧪 Testing YouTube Agent (kratos-3)")
-    print("="*50)
-    youtube_task = "Analyze the YouTube video with URL: https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    print(f"⚡ Task: {youtube_task}")
-    print("💬 Response:")
-    for response_chunk in invoke('kratos-3', youtube_task):
-        print(response_chunk, end='', flush=True)
-    print()
-
-    # Cleanup all agents
-    print("\n" + "="*50)
-    print("💰 Cleaning up agents...")
-    print(f"🗑️ {remove('kratos-1')}")
-    print(f"🗑️ {remove('kratos-2')}")
-    print(f"🗑️ {remove('kratos-3')}")
+    print("💰 Cleaning up agent...")
+    print(f"🗑️ {remove('test-agent')}")
