@@ -4,4 +4,8 @@ version = "0.1.0"
 description = "Kratos is a serverless intelligence platform for running ephemeral AI agents in isolated microVMs."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "agno>=1.7.1",
+    "microsandbox>=0.1.8",
+    "sh>=2.2.2",
+]
