@@ -1,7 +1,7 @@
 [project]
 name = "kratos"
 version = "0.1.0"
-description = "Add your description here"
+description = "Kratos is a serverless intelligence platform for running ephemeral AI agents in isolated microVMs."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
