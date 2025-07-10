@@ -16,7 +16,7 @@ def _ensure_base_image_exists() -> None:
     """Build the base image if it doesn't exist."""
     try:
         client.images.get(BASE_IMAGE_NAME)
-    except docker.errors.ImageNotFound:
+    except docker.errors.ImageNotFound:  # pyright: ignore
         try:
             client.images.build(path=".", tag=BASE_IMAGE_NAME, rm=True)
         except Exception as e:
@@ -35,16 +35,7 @@ def _extract_model_id(serialized_agent: bytes) -> Optional[str]:
     try:
         import cloudpickle
         agent = cloudpickle.loads(serialized_agent)
-        
-        # Try to get the model ID from the agent's model
-        if hasattr(agent, 'model') and hasattr(agent.model, 'id'):
-            return agent.model.id
-        elif hasattr(agent, 'model') and hasattr(agent.model, 'model'):
-            return agent.model.model
-        elif hasattr(agent, 'model') and hasattr(agent.model, 'name'):
-            return agent.model.name
-        
-        return None
+        return agent.model.id
     except Exception:
         return None
 
@@ -142,27 +133,23 @@ instructions = sys.argv[1] if len(sys.argv) > 1 else "Hello"
 
 # Run the agent with streaming enabled
 try:
+    # Try streaming first
     response = agent.run(instructions, stream=True)
     
-    # Check if response is a generator (streaming)
-    if hasattr(response, '__iter__') and not isinstance(response, str):
-        # Stream the response chunks
-        full_content = ""
-        for chunk in response:
-            if hasattr(chunk, 'content') and chunk.content:
-                content = chunk.content
-                print(content, end='', flush=True)
-                full_content += content
-        print()  # Final newline
-    else:
-        # Non-streaming response
-        if hasattr(response, 'content'):
-            print(response.content)
-        else:
-            print(response)
+    from agno.utils.pprint import pprint_run_response
+    
+    # For now, just use the response directly with pprint
+    # The streaming will happen at the model level
+    pprint_run_response(response, markdown=True)
 except Exception as e:
-    print(f"Error running agent: {{e}}", file=sys.stderr)
-    sys.exit(1)
+    # Fallback to non-streaming if streaming fails
+    try:
+        response = agent.run(instructions, stream=False)
+        from agno.utils.pprint import pprint_run_response
+        pprint_run_response(response, markdown=True)
+    except Exception as e2:
+        print(f"Error running agent: {{e2}}", file=sys.stderr)
+        sys.exit(1)
 '''
         
         # Write the Python script to a temporary file in the container
@@ -198,7 +185,7 @@ def cleanup_agent(name: str) -> None:
         container = client.containers.get(name)
         container.stop()
         container.remove()
-    except docker.errors.NotFound:
+    except docker.errors.NotFound:  # pyright: ignore
         pass  # Container doesn't exist, which is fine
     except Exception as e:
         raise RuntimeError(f"Failed during cleanup of container {name}: {e}") from e
