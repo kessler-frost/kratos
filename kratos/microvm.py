@@ -1,4 +1,4 @@
-# Kratos: Serverless compute platform for ephemeral agents
+# Kratos: Serverless Intelligence Platform
 # Currently using Docker containers, but will migrate to native Apple Containers
 # when they become available on the latest macOS for better performance per watt.
 
@@ -7,10 +7,13 @@ import docker
 from typing import Optional, List
 
 
+# Configuration
 client = docker.from_env()
 BASE_IMAGE_NAME = "kratos-agent-base"
 AGENT_FILE_PATH = "/agent.pkl"
 WORKDIR = "/workdir"
+MODEL_SIZE_LIMIT_GB = 6.0
+MODEL_PULL_TIMEOUT = 30
 
 
 def _ensure_base_image_exists() -> None:
@@ -71,18 +74,18 @@ def _check_model_size(model_id: str, container) -> tuple[bool, str]:
     """
     try:
         # Pull the model to get accurate size information (with timeout for large models)
-        pull_result = container.exec_run(["/bin/bash", "-c", f"timeout 30s ollama pull {model_id}"])
+        pull_result = container.exec_run(["/bin/bash", "-c", f"timeout {MODEL_PULL_TIMEOUT}s ollama pull {model_id}"])
         if pull_result.exit_code != 0:
             pull_output = pull_result.output.decode() if pull_result.output else ""
             if "timeout" in pull_output.lower() or pull_result.exit_code == 124:
-                return False, f"Model {model_id} pull timed out (likely >6GB). Kratos supports models ≤6GB for efficiency and optimization reasons."
+                return False, f"Model {model_id} pull timed out (likely >{MODEL_SIZE_LIMIT_GB}GB). Kratos supports models ≤{MODEL_SIZE_LIMIT_GB}GB for efficiency and optimization."
             elif "not found" in pull_output.lower():
                 return False, f"Model {model_id} not found in Ollama registry."
             else:
                 return False, f"Failed to pull model {model_id}: {pull_output}"
         
         # Get the actual model size using ollama show
-        result = container.exec_run(["/bin/bash", "-c", f"ollama show {model_id} | grep -i 'size\|parameters' || ollama list | grep '{model_id}'"])
+        result = container.exec_run(["/bin/bash", "-c", f"ollama show {model_id} | grep -i 'size\\|parameters' || ollama list | grep '{model_id}'"])
         
         if result.exit_code == 0:
             output = result.output.decode().strip()
@@ -256,23 +259,35 @@ instructions = sys.argv[1] if len(sys.argv) > 1 else "Hello"
 
 # Run the agent with streaming enabled
 try:
-    # Try streaming first
     response = agent.run(instructions, stream=True)
     
-    from agno.utils.pprint import pprint_run_response
-    
-    # For now, just use the response directly with pprint
-    # The streaming will happen at the model level
-    pprint_run_response(response, markdown=True)
+    # Handle streaming response properly
+    if hasattr(response, '__iter__') and not isinstance(response, str):
+        # Streaming response - collect all chunks to build complete content
+        content_parts = []
+        final_response = None
+        
+        for chunk in response:
+            final_response = chunk
+            if hasattr(chunk, 'content') and chunk.content:
+                content_parts.append(chunk.content)
+        
+        # Print the complete content from all chunks
+        if content_parts:
+            print(''.join(content_parts))
+        elif final_response and hasattr(final_response, 'content'):
+            print(final_response.content)
+        else:
+            print(final_response)
+    else:
+        # Non-streaming response
+        if hasattr(response, 'content'):
+            print(response.content)
+        else:
+            print(response)
 except Exception as e:
-    # Fallback to non-streaming if streaming fails
-    try:
-        response = agent.run(instructions, stream=False)
-        from agno.utils.pprint import pprint_run_response
-        pprint_run_response(response, markdown=True)
-    except Exception as e2:
-        print(f"Error running agent: {{e2}}", file=sys.stderr)
-        sys.exit(1)
+    print(f"Error running agent: {{e}}", file=sys.stderr)
+    sys.exit(1)
 '''
         
         # Write the Python script to a temporary file in the container

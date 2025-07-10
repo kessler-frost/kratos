@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Kratos Demo: Serverless compute platform for ephemeral agents
+Kratos: Serverless Intelligence Platform Demo
 
-Demonstrates lightweight, short-lived agents handling micro-tasks like search,
+Demonstrates lightweight, ephemeral agents handling micro-tasks like search,
 parsing, editing, and content generation with per-second billing efficiency.
 
 Core operations:
@@ -11,18 +11,18 @@ Core operations:
 3. remove() - Teardown and reclaim resources
 """
 
-from main import submit, invoke, remove, create_simple_agent
+from main import submit, invoke, remove, create_agent
 
 
 def demo_kratos_micro_tasks():
-    """Demonstrate Kratos serverless micro-task execution."""
+    """Demonstrate Kratos serverless intelligence platform."""
     
-    print("🚀 Kratos Demo - Serverless Micro-Task Platform")
-    print("=" * 50)
+    print("🚀 Kratos: Serverless Intelligence Platform")
+    print("=" * 45)
     
     # Step 1: Deploy serverless agent
     print("📦 Deploying serverless agent for micro-tasks...")
-    agent = create_simple_agent()
+    agent = create_agent()
     agent_name = "micro-task-demo"
     
     deployment_result = submit(agent, agent_name)
@@ -49,7 +49,7 @@ def demo_kratos_micro_tasks():
     removal_result = remove(agent_name)
     print(f"✅ {removal_result}")
     
-    print("\n🎉 Kratos micro-task demo completed!")
+    print("\n🎉 Kratos: Serverless Intelligence Platform demo completed!")
 
 
 def demo_multiple_agents():
@@ -65,7 +65,7 @@ def demo_multiple_agents():
         agent_name = f"agent-{i+1}"
         print(f"\n📦 Creating and deploying {agent_name}...")
         
-        agent = create_simple_agent()
+        agent = create_agent()
         deployment_result = submit(agent, agent_name)
         agents.append(agent_name)
         print(f"✅ {deployment_result}")
