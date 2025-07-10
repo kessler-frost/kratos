@@ -263,28 +263,22 @@ try:
     
     # Handle streaming response properly
     if hasattr(response, '__iter__') and not isinstance(response, str):
-        # Streaming response - collect all chunks to build complete content
-        content_parts = []
-        final_response = None
-        
+        # Streaming response - print chunks as they come
         for chunk in response:
-            final_response = chunk
             if hasattr(chunk, 'content') and chunk.content:
-                content_parts.append(chunk.content)
-        
-        # Print the complete content from all chunks
-        if content_parts:
-            print(''.join(content_parts))
-        elif final_response and hasattr(final_response, 'content'):
-            print(final_response.content)
-        else:
-            print(final_response)
+                print(chunk.content, end='', flush=True)
+            elif hasattr(chunk, 'text') and chunk.text:
+                print(chunk.text, end='', flush=True)
+            elif isinstance(chunk, str):
+                print(chunk, end='', flush=True)
+            else:
+                print(str(chunk), end='', flush=True)
     else:
         # Non-streaming response
         if hasattr(response, 'content'):
-            print(response.content)
+            print(response.content, end='', flush=True)
         else:
-            print(response)
+            print(response, end='', flush=True)
 except Exception as e:
     print(f"Error running agent: {{e}}", file=sys.stderr)
     sys.exit(1)
