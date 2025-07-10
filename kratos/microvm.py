@@ -3,8 +3,6 @@
 
 import docker
 from typing import Optional, List
-import tarfile
-import io
 
 
 client = docker.from_env()
@@ -58,16 +56,14 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
         print("Failed to add dependencies:", res.output)
     
     # Create agent.pkl file with the serialized agent
-    # Create a tar archive in memory containing the agent.pkl file
-    tar_stream = io.BytesIO()
-    with tarfile.open(fileobj=tar_stream, mode='w') as tar:
-        agent_info = tarfile.TarInfo(name='agent.pkl')
-        agent_info.size = len(serialized_agent)
-        agent_data = io.BytesIO(serialized_agent)
-        tar.addfile(agent_info, agent_data)
+    # Write the serialized agent to a file using base64 encoding to handle binary data
+    import base64
+    encoded_agent = base64.b64encode(serialized_agent).decode('utf-8')
     
-    tar_stream.seek(0)
-    container.put_archive(path='/', data=tar_stream)
+    # Create the agent.pkl file by decoding the base64 data
+    res = container.exec_run(["/bin/bash", "-c", f'echo "{encoded_agent}" | base64 -d > /agent.pkl'])
+    if res.exit_code != 0:
+        print("Failed to create agent.pkl:", res.output)
     
     # Stop the container
     container.stop()
