@@ -10,5 +10,6 @@ except ImportError:
 from sh import uv, ollama  # pyright: ignore
 
 uv.init()
-uv.add("ollama")
-uv.add("agno")
+uv.add("ollama", "agno")
+
+print("Installed uv and ollama")
