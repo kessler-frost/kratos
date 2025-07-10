@@ -1,2 +1,1 @@
 from sh import msb  # pyright: ignore
-

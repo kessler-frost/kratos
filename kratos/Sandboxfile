@@ -1,0 +1,7 @@
+# Sandbox configurations
+sandboxes:
+  test:
+    image: 'astral/uv:python3.11-bookworm-slim'
+    memory: 2048
+    cpus: 2
+    shell: /bin/sh
