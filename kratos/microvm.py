@@ -3,12 +3,29 @@
 
 import docker
 from typing import Optional, List
+import subprocess
 
 
 client = docker.from_env()
+BASE_IMAGE_NAME = "kratos-agent-base"
+
+
+def _ensure_base_image_exists():
+    """Build the base image if it doesn't exist"""
+    try:
+        client.images.get(BASE_IMAGE_NAME)
+        print(f"Base image {BASE_IMAGE_NAME} already exists")
+    except docker.errors.ImageNotFound:  # pyright: ignore
+        print(f"Building base image {BASE_IMAGE_NAME}...")
+        # Build the image from the Dockerfile in the current directory
+        client.images.build(path=".", tag=BASE_IMAGE_NAME, rm=True)
+        print(f"Base image {BASE_IMAGE_NAME} built successfully")
 
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
+    
+    # Ensure base image exists
+    _ensure_base_image_exists()
     
     # Clean up any existing container with the same name
     try:
@@ -18,42 +35,16 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     except docker.errors.NotFound:  # pyright: ignore
         pass  # Container doesn't exist, which is fine
     
-    # Start the ollama container
-    container = client.containers.create(name=name, image="ollama/ollama", command="serve", detach=True)
+    # Create container from base image (don't start yet)
+    container = client.containers.create(name=name, image=BASE_IMAGE_NAME, command="serve", detach=True)
     container.start()
     
-    default_deps = ["ollama", "agno", "cloudpickle"]
-    all_deps = default_deps.copy()
+    # Install additional dependencies if specified
     if dependencies:
-        all_deps.extend(dependencies)
-    
-    # Install all dependencies
-    deps_str = " ".join(all_deps)
-
-    # Create working directory first
-    res = container.exec_run("mkdir -p /workdir")
-    if res.exit_code != 0:
-        print("Failed to create workdir:", res.output)
-
-    # Install system dependencies
-    res = container.exec_run(["/bin/bash", "-c", "apt update && apt upgrade -y && apt install -y curl"])
-    if res.exit_code != 0:
-        print("Failed to install system dependencies:", res.output)
-
-    # Install uv
-    res = container.exec_run(["/bin/bash", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"])
-    if res.exit_code != 0:
-        print("Failed to install uv:", res.output)
-
-    # Initialize uv project in workdir
-    res = container.exec_run(["/bin/bash", "-c", "/root/.local/bin/uv init"], workdir="/workdir")
-    if res.exit_code != 0:
-        print("Failed to initialize uv project:", res.output)
-
-    # Add dependencies
-    res = container.exec_run(["/bin/bash", "-c", f"/root/.local/bin/uv add {deps_str}"], workdir="/workdir")
-    if res.exit_code != 0:
-        print("Failed to add dependencies:", res.output)
+        deps_str = " ".join(dependencies)
+        res = container.exec_run(["/bin/bash", "-c", f"uv add {deps_str}"], workdir="/workdir")
+        if res.exit_code != 0:
+            print("Failed to add additional dependencies:", res.output)
     
     # Create agent.pkl file with the serialized agent
     # Write the serialized agent to a file using base64 encoding to handle binary data
@@ -71,14 +62,16 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
 
 def run_agent(name: str, instructions: str) -> str:
     """
-    Start the container and run the agent with the given instructions.
+    Run the agent with the given instructions in the existing container.
     Streams the output from the agent as it generates.
+    This is designed to be called multiple times after bootstrap (Lambda-style).
     """
     # Get the container by name
     container = client.containers.get(name)
     
-    # Start the container
-    container.start()
+    # Start the container if it's not running
+    if container.status != 'running':
+        container.start()
     
     # Create a Python script to unpickle and run the agent with streaming
     python_script = f'''
@@ -113,8 +106,22 @@ print()
         # Yield each chunk for streaming to the caller
         print(chunk_str, end='', flush=True)
     
-    # Stop the container after execution
-    container.stop()
+    # Keep the container running for future invocations (Lambda-style)
+    # Don't stop the container here
     
     # Return the complete output
     return full_output
+
+
+def cleanup_agent(name: str) -> None:
+    """
+    Stop and remove the agent container.
+    Call this when you're done with the agent to free up resources.
+    """
+    try:
+        container = client.containers.get(name)
+        container.stop()
+        container.remove()
+        print(f"Agent container {name} cleaned up successfully")
+    except docker.errors.NotFound:  # pyright: ignore
+        print(f"Agent container {name} not found")
