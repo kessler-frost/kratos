@@ -1,2 +1,2 @@
-from kratos.bootstrap import bootstrap_vm
+from kratos.sandbox import bootstrap_vm
 
