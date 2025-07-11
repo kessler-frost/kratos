@@ -186,5 +186,7 @@ Right now, one of the most powerful and energy-efficient chips in the market, th
 
 Compute has already become super cheap. It's time we start converting it into intelligence.
 
-As AI models get smaller and more capable, as microVMs become the standard, as intelligence becomes truly distributed—**Kratos is built to solve the problems of tomorrow.**
+As AI models get smaller and more capable, as microVMs become the standard, as intelligence becomes truly distributed, we will inevitably need something like this.
+
+**Built to solve the problems of tomorrow.**
 
