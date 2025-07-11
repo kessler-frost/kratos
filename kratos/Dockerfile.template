@@ -6,7 +6,7 @@ WORKDIR /workdir
 
 # Initialize uv project and install common dependencies
 RUN uv init
-RUN uv add agno cloudpickle openai
+RUN uv add agno cloudpickle openai ddgs duckduckgo-search yfinance youtube-transcript-api
 
 # Install any additional dependencies if specified
 {{DEPENDENCIES_INSTALL}}

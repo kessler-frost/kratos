@@ -28,15 +28,6 @@ def _exec_command(container, command: str, workdir: str = WORKDIR) -> None:
         raise RuntimeError(f"Command failed: {command}\nOutput: {result.output}")
 
 
-def _extract_model_id(serialized_agent: bytes) -> Optional[str]:
-    """Extract the model ID from a serialized agent."""
-    try:
-        agent = cloudpickle.loads(serialized_agent)
-        return agent.model.id
-    except Exception:
-        return None
-
-
 def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
     """Validate agent model for Kratos requirements.
     
@@ -46,17 +37,14 @@ def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
     try:
         agent = cloudpickle.loads(serialized_agent)
         
-        # Check if model provider is OpenAILike
+        # Check if model provider is LMStudio
         model_type = type(agent.model).__name__
-        if model_type != 'OpenAILike':
-            return False, f"Kratos only supports OpenAILike models for efficient local compute. Found: {model_type}"
+        if model_type != 'LMStudio':
+            return False, f"Kratos only supports LMStudio models for efficient local compute. Found: {model_type}"
         
         return True, ""
     except Exception as e:
         return False, f"Failed to validate agent model: {e}"
-
-
-# Model size checking removed as it's no longer needed for OpenAILike models
 
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
@@ -80,9 +68,6 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     if not is_valid:
         raise RuntimeError(f"Agent validation failed: {error_msg}")
     
-    # Extract model ID for later use in the image build
-    model_id = _extract_model_id(serialized_agent)
-    
     # Clean up any existing image with the same name
     agent_image_name = f"kratos-agent-{name}"
     try:
@@ -103,7 +88,6 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         image_name: Name for the custom image
         serialized_agent: Cloudpickle-serialized agent
         dependencies: Optional list of additional Python packages
-        model_id: Optional model ID to pull into the image
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         # Read the Dockerfile template

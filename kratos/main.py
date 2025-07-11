@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from agno.models.openai.like import OpenAILike
+from agno.models.lmstudio import LMStudio
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
@@ -39,7 +39,7 @@ def remove(name: str) -> str:
 def create_web_search_agent(model: str) -> Agent:
     """Create a Kratos agent specialized for web search."""
     return Agent(
-        model=OpenAILike(
+        model=LMStudio(
             id=model,
             base_url="http://host.docker.internal:1234/v1",
         ),
@@ -53,7 +53,7 @@ def create_web_search_agent(model: str) -> Agent:
 def create_finance_agent(model: str) -> Agent:
     """Create a Kratos agent specialized for financial data."""
     return Agent(
-        model=OpenAILike(
+        model=LMStudio(
             id=model,
             base_url="http://host.docker.internal:1234/v1",
         ),
@@ -67,7 +67,7 @@ def create_finance_agent(model: str) -> Agent:
 def create_youtube_agent(model: str) -> Agent:
     """Create a Kratos agent specialized for YouTube analysis."""
     return Agent(
-        model=OpenAILike(
+        model=LMStudio(
             id=model,
             base_url="http://host.docker.internal:1234/v1",
         ),
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     print("🔄 Building and submitting test agent...")
 
     test_agent = create_web_search_agent("qwen3")
-    print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
+    print(f"🚀 {submit(test_agent, 'test-agent')}")
 
     # Test single execution
     print("\n" + "="*50)
