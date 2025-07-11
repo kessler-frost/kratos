@@ -14,27 +14,11 @@ from typing import Optional, List, Iterator
 
 # Configuration
 client = docker.from_env()
-BASE_IMAGE_NAME = "kratos-base"
 AGENT_FILE_PATH = "/agent.pkl"
 WORKDIR = "/workdir"
-MODEL_SIZE_LIMIT_GB = 6.0
-MODEL_PULL_TIMEOUT = 120  # 2 minutes max for model pulls
 CONTAINER_EXECUTION_TIMEOUT = 300  # 5 minutes max for container execution
 BUILD_TIMEOUT = 600  # 10 minutes max for image builds
 
-
-
-def _ensure_optimized_base_image() -> None:
-    """Build the optimized base image if it doesn't exist."""
-    try:
-        client.images.get(BASE_IMAGE_NAME)
-    except docker.errors.ImageNotFound:  # pyright: ignore
-        try:
-            dockerfile_path = os.path.join(os.path.dirname(__file__), "Dockerfile.base")
-            build_path = os.path.dirname(__file__)
-            client.images.build(path=build_path, dockerfile=dockerfile_path, tag=BASE_IMAGE_NAME, rm=True, timeout=BUILD_TIMEOUT)
-        except Exception as e:
-            raise RuntimeError(f"Failed to build optimized base image: {e}") from e
 
 
 def _exec_command(container, command: str, workdir: str = WORKDIR) -> None:
@@ -72,19 +56,7 @@ def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
         return False, f"Failed to validate agent model: {e}"
 
 
-def _check_model_size(model_id: str, container) -> tuple[bool, str]:
-    """Check if model is available for OpenAILike connection.
-    
-    For OpenAILike models, we don't need to pull or check size since they're accessed via API.
-    
-    Returns:
-        tuple: (is_valid, success_message)
-    """
-    # For OpenAILike models, we don't need to check size as they're accessed via API
-    return True, f"Model {model_id} configured for OpenAI-like API access"
-
-
-# Size parsing function removed as it's no longer needed for OpenAILike models
+# Model size checking removed as it's no longer needed for OpenAILike models
 
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
@@ -119,14 +91,11 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     except docker.errors.ImageNotFound:  # pyright: ignore
         pass  # Image doesn't exist, which is fine
     
-    # Ensure optimized base image exists
-    _ensure_optimized_base_image()
-    
-    # Build custom image with dependencies and model baked in
-    _build_agent_image(agent_image_name, serialized_agent, dependencies, model_id)
+    # Build custom image with dependencies directly
+    _build_agent_image(agent_image_name, serialized_agent, dependencies)
 
 
-def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None, model_id: Optional[str] = None) -> None:
+def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
     """
     Build a custom Docker image with dependencies and model baked in.
     
@@ -142,25 +111,15 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         with open(template_path, 'r') as f:
             dockerfile_content = f.read()
         
-        # Prepare additional dependencies installation command (most common ones are pre-installed)
+        # Prepare additional dependencies installation command
         if dependencies:
-            # Filter out already installed dependencies
-            common_deps = {"ddgs", "duckduckgo-search", "yfinance", "youtube-transcript-api"}
-            additional_deps = [dep for dep in dependencies if dep not in common_deps]
-            if additional_deps:
-                deps_str = " ".join(additional_deps)
-                dependencies_install = f"RUN uv add {deps_str}"
-            else:
-                dependencies_install = "# All dependencies already installed in base image"
+            deps_str = " ".join(dependencies)
+            dependencies_install = f"RUN uv add {deps_str}"
         else:
             dependencies_install = "# No additional dependencies"
         
-        # For OpenAILike models, no need to pull models locally
-        model_pull = "# OpenAILike models are accessed via API, no local pulling needed"
-        
         # Replace template placeholders
         dockerfile_content = dockerfile_content.replace("{{DEPENDENCIES_INSTALL}}", dependencies_install)
-        dockerfile_content = dockerfile_content.replace("{{MODEL_PULL}}", model_pull)
         
         # Write the customized Dockerfile
         dockerfile_path = os.path.join(temp_dir, "Dockerfile")
@@ -342,7 +301,6 @@ def prune() -> None:
     This includes:
     - All kratos-agent-* images
     - All kratos-invoke-* containers (ephemeral execution containers)
-    - The kratos-agent-base image
     
     Raises:
         RuntimeError: If cleanup fails
@@ -375,15 +333,6 @@ def prune() -> None:
                 client.images.remove(image.id, force=True)
             except Exception:
                 pass  # Ignore individual image cleanup errors
-        
-        # Also try to remove the optimized base image
-        try:
-            base_image = client.images.get(BASE_IMAGE_NAME)
-            client.images.remove(base_image.id, force=True)
-        except docker.errors.ImageNotFound:  # pyright: ignore
-            pass  # Base image doesn't exist, which is fine
-        except Exception:
-            pass  # Ignore base image cleanup errors
             
     except Exception as e:
         raise RuntimeError(f"Failed to prune Kratos resources: {e}") from e

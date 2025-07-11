@@ -3,16 +3,15 @@ from agno.models.openai.like import OpenAILike
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
-from .sandbox import bootstrap, invoke_agent, cleanup_agent
+from sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
-from typing import Iterator
+from typing import Iterator, Optional, List
 import time
 
 
-def submit(agent: Agent, name: str) -> str:
+def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
     """Deploy an agent."""
     try:
-        dependencies = ["ddgs", "duckduckgo-search", "yfinance", "youtube-transcript-api"]
         bootstrap(name, cloudpickle.dumps(agent), dependencies)
         return f"Agent deployed: {name}"
     except Exception as e:
@@ -42,7 +41,7 @@ def create_web_search_agent(model: str) -> Agent:
     return Agent(
         model=OpenAILike(
             id=model,
-            base_url="http://host.docker.internal:28100/v1",
+            base_url="http://host.docker.internal:1234/v1",
         ),
         name="KratosWebSearch",
         tools=[DuckDuckGoTools()],
@@ -56,7 +55,7 @@ def create_finance_agent(model: str) -> Agent:
     return Agent(
         model=OpenAILike(
             id=model,
-            base_url="http://host.docker.internal:28100/v1",
+            base_url="http://host.docker.internal:1234/v1",
         ),
         name="KratosFinance",
         tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True)],
@@ -70,7 +69,7 @@ def create_youtube_agent(model: str) -> Agent:
     return Agent(
         model=OpenAILike(
             id=model,
-            base_url="http://host.docker.internal:28100/v1",
+            base_url="http://host.docker.internal:1234/v1",
         ),
         name="KratosYouTube",
         tools=[YouTubeTools()],
@@ -88,7 +87,7 @@ if __name__ == "__main__":
     print("🔄 Building and submitting test agent...")
 
     test_agent = create_web_search_agent("qwen3")
-    print(f"🚀 {submit(test_agent, 'test-agent')}")
+    print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
 
     # Test single execution
     print("\n" + "="*50)

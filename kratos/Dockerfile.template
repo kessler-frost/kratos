@@ -1,4 +1,12 @@
-FROM kratos-base:latest
+FROM ghcr.io/astral-sh/uv:debian-slim
+
+# Create working directory
+RUN mkdir -p /workdir
+WORKDIR /workdir
+
+# Initialize uv project and install common dependencies
+RUN uv init
+RUN uv add agno cloudpickle openai
 
 # Install any additional dependencies if specified
 {{DEPENDENCIES_INSTALL}}
