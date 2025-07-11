@@ -1,8 +1,6 @@
 from agno.agent import Agent
 from agno.models.lmstudio import LMStudio
 from agno.tools.duckduckgo import DuckDuckGoTools
-from agno.tools.yfinance import YFinanceTools
-from agno.tools.youtube import YouTubeTools
 from sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
 from typing import Iterator, Optional, List
@@ -36,48 +34,6 @@ def remove(name: str) -> str:
         return f"Failed: {e}"
 
 
-def create_web_search_agent(model: str) -> Agent:
-    """Create a Kratos agent specialized for web search."""
-    return Agent(
-        model=LMStudio(
-            id=model,
-            base_url="http://host.docker.internal:1234/v1",
-        ),
-        name="KratosWebSearch",
-        tools=[DuckDuckGoTools()],
-        instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
-        show_tool_calls=False,
-    )
-
-
-def create_finance_agent(model: str) -> Agent:
-    """Create a Kratos agent specialized for financial data."""
-    return Agent(
-        model=LMStudio(
-            id=model,
-            base_url="http://host.docker.internal:1234/v1",
-        ),
-        name="KratosFinance",
-        tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True)],
-        instructions="You are Kratos Finance Agent, specialized in stock market analysis and financial data. Use YFinance to get current stock prices, analyst recommendations, and company information. When users ask about stocks, always provide current prices and relevant financial metrics. Be precise with numbers and explain what the data means for investment decisions.",
-        show_tool_calls=False,
-    )
-
-
-def create_youtube_agent(model: str) -> Agent:
-    """Create a Kratos agent specialized for YouTube analysis."""
-    return Agent(
-        model=LMStudio(
-            id=model,
-            base_url="http://host.docker.internal:1234/v1",
-        ),
-        name="KratosYouTube",
-        tools=[YouTubeTools()],
-        instructions="You are Kratos YouTube Agent, specialized in analyzing YouTube videos and transcripts. Use YouTube tools to extract video information, transcripts, and analyze content. When users mention YouTube videos, provide detailed analysis of the content, key points, and insights from the transcript. Be thorough in your analysis and highlight important information.",
-        show_tool_calls=False,
-    )
-
-
 if __name__ == "__main__":
 
     print("🚀 Kratos: Serverless Intelligence Platform")
@@ -86,8 +42,17 @@ if __name__ == "__main__":
     # Create and deploy a single test agent
     print("🔄 Building and submitting test agent...")
 
-    test_agent = create_web_search_agent("qwen3")
-    print(f"🚀 {submit(test_agent, 'test-agent')}")
+    test_agent = Agent(
+        model=LMStudio(
+            id="qwen/qwen3-4b",
+            base_url="http://host.docker.internal:1234/v1",
+        ),
+        name="KratosWebSearch",
+        tools=[DuckDuckGoTools()],
+        instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
+        show_tool_calls=False,
+    )
+    print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
 
     # Test single execution
     print("\n" + "="*50)

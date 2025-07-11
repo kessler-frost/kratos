@@ -2,7 +2,6 @@
 # Currently using Docker containers, but will migrate to native Apple Containers
 # when they become available on the latest macOS for better performance per watt.
 
-import base64
 import cloudpickle
 import docker
 import os
@@ -17,15 +16,7 @@ client = docker.from_env()
 AGENT_FILE_PATH = "/agent.pkl"
 WORKDIR = "/workdir"
 CONTAINER_EXECUTION_TIMEOUT = 300  # 5 minutes max for container execution
-BUILD_TIMEOUT = 600  # 10 minutes max for image builds
-
-
-
-def _exec_command(container, command: str, workdir: str = WORKDIR) -> None:
-    """Execute a command in the container and raise on failure."""
-    result = container.exec_run(["/bin/bash", "-c", command], workdir=workdir)
-    if result.exit_code != 0:
-        raise RuntimeError(f"Command failed: {command}\nOutput: {result.output}")
+BUILD_TIMEOUT = 300  # 5 minutes max for image builds
 
 
 def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
@@ -45,6 +36,19 @@ def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
         return True, ""
     except Exception as e:
         return False, f"Failed to validate agent model: {e}"
+
+
+def _extract_model_name(serialized_agent: bytes) -> str:
+    """Extract the model name from a serialized agent.
+    
+    Returns:
+        str: The model name or 'unknown' if extraction fails
+    """
+    try:
+        agent = cloudpickle.loads(serialized_agent)
+        return getattr(agent.model, 'id', 'unknown')
+    except Exception:
+        return 'unknown'
 
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
@@ -68,6 +72,9 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     if not is_valid:
         raise RuntimeError(f"Agent validation failed: {error_msg}")
     
+    # Extract model name for later use
+    model_name = _extract_model_name(serialized_agent)
+    
     # Clean up any existing image with the same name
     agent_image_name = f"kratos-agent-{name}"
     try:
@@ -77,10 +84,10 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
         pass  # Image doesn't exist, which is fine
     
     # Build custom image with dependencies directly
-    _build_agent_image(agent_image_name, serialized_agent, dependencies)
+    _build_agent_image(agent_image_name, serialized_agent, dependencies, model_name)
 
 
-def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
+def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None, model_name: str = "unknown") -> None:
     """
     Build a custom Docker image with dependencies and model baked in.
     
@@ -88,6 +95,7 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         image_name: Name for the custom image
         serialized_agent: Cloudpickle-serialized agent
         dependencies: Optional list of additional Python packages
+        model_name: Name of the model used by the agent
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         # Read the Dockerfile template
@@ -104,6 +112,7 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         
         # Replace template placeholders
         dockerfile_content = dockerfile_content.replace("{{DEPENDENCIES_INSTALL}}", dependencies_install)
+        dockerfile_content = dockerfile_content.replace("{{MODEL_NAME}}", model_name)
         
         # Write the customized Dockerfile
         dockerfile_path = os.path.join(temp_dir, "Dockerfile")
@@ -114,6 +123,12 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         agent_path = os.path.join(temp_dir, "agent.pkl")
         with open(agent_path, 'wb') as f:
             f.write(serialized_agent)
+        
+        # Copy execute.py to the build context
+        execute_py_source = os.path.join(os.path.dirname(__file__), "execute.py")
+        execute_py_dest = os.path.join(temp_dir, "execute.py")
+        with open(execute_py_source, 'r') as src, open(execute_py_dest, 'w') as dst:
+            dst.write(src.read())
         
         # Build the custom image with timeout
         try:
@@ -150,68 +165,33 @@ def invoke_agent(name: str, instructions: str) -> Iterator[str]:
         # Generate unique container name for this invocation
         container_name = f"kratos-invoke-{name}-{uuid.uuid4().hex[:4]}"
         
-        # Create and start ephemeral container
+        # Get the model name from the image labels
         try:
-            container = client.containers.create(
-                name=container_name, 
-                image=agent_image_name, 
-                command=["sleep", "infinity"],  # Keep container running for script execution
-                detach=True
+            image = client.images.get(agent_image_name)
+            model_name = image.labels.get('kratos.model_name', 'unknown')
+        except Exception:
+            model_name = "unknown"
+        
+        # Create and run ephemeral container with keyword arguments
+        try:
+            container = client.containers.run(
+                image=agent_image_name,
+                command=[
+                    "--model_name", model_name,
+                    "--container_name", container_name,
+                    "--instructions", instructions
+                ],
+                name=container_name,
+                detach=True,
+                remove=False  # We'll remove it manually after getting the logs
             )
-            container.start()
         except docker.errors.ImageNotFound:  # pyright: ignore
             raise RuntimeError(f"Agent image '{agent_image_name}' not found. Please bootstrap the agent first.")
         
-        # Create a Python script to unpickle and run the agent with streaming
-        python_script = f'''
-import cloudpickle
-import sys
-
-# Load the agent from the pickle file
-with open('/workdir/agent.pkl', 'rb') as f:
-    agent = cloudpickle.load(f)
-
-# Get instructions from command line argument
-instructions = sys.argv[1] if len(sys.argv) > 1 else "Hello"
-
-# Run the agent with streaming enabled
-try:
-    response = agent.run(instructions, stream=True)
-    
-    # Handle streaming response properly
-    if hasattr(response, '__iter__') and not isinstance(response, str):
-        # Streaming response - print chunks as they come
-        for chunk in response:
-            if hasattr(chunk, 'content') and chunk.content:
-                print(chunk.content, end='', flush=True)
-            elif hasattr(chunk, 'text') and chunk.text:
-                print(chunk.text, end='', flush=True)
-            elif isinstance(chunk, str):
-                print(chunk, end='', flush=True)
-            else:
-                print(str(chunk), end='', flush=True)
-    else:
-        # Non-streaming response
-        if hasattr(response, 'content'):
-            print(response.content, end='', flush=True)
-        else:
-            print(response, end='', flush=True)
-except Exception as e:
-    print(f"Error running agent: {{e}}", file=sys.stderr)
-    sys.exit(1)
-'''
-        
-        # Write the Python script to a temporary file in the container
-        script_content_b64 = base64.b64encode(python_script.encode('utf-8')).decode('utf-8')
-        _exec_command(container, f'echo "{script_content_b64}" | base64 -d > /run_agent.py', workdir="/")
-        
         start_time = time.time()
         
-        # Execute with streaming
-        exec_result = container.exec_run(["/bin/bash", "-c", f'/usr/local/bin/uv run python /run_agent.py "{instructions}"'], workdir=WORKDIR, stream=True)
-        
-        # Yield output chunks as they come with timeout enforcement
-        for chunk in exec_result.output:
+        # Stream the container logs as they are generated
+        for log_chunk in container.logs(stream=True, follow=True):
             # Check if we've exceeded the timeout
             if time.time() - start_time > CONTAINER_EXECUTION_TIMEOUT:
                 # Kill the container if it's taking too long
@@ -221,9 +201,16 @@ except Exception as e:
                     pass
                 raise RuntimeError(f"Container execution timeout exceeded ({CONTAINER_EXECUTION_TIMEOUT} seconds)")
             
-            chunk_str = chunk.decode() if isinstance(chunk, bytes) else str(chunk)
+            chunk_str = log_chunk.decode() if isinstance(log_chunk, bytes) else str(log_chunk)
             if chunk_str.strip():  # Only yield non-empty chunks
                 yield chunk_str
+        
+        # Wait for container to finish and check exit code
+        container.wait()
+        result = container.attrs['State']
+        if result['ExitCode'] != 0:
+            error_logs = container.logs().decode()
+            raise RuntimeError(f"Agent execution failed with exit code {result['ExitCode']}: {error_logs}")
                 
     except docker.errors.NotFound:  # pyright: ignore
         raise RuntimeError(f"Agent image '{agent_image_name}' not found. Did you run bootstrap first?") from None
@@ -233,7 +220,6 @@ except Exception as e:
         # Always clean up the ephemeral container
         if container:
             try:
-                container.stop()
                 container.remove()
             except Exception:
                 pass  # Ignore cleanup errors

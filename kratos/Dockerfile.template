@@ -6,13 +6,17 @@ WORKDIR /workdir
 
 # Initialize uv project and install common dependencies
 RUN uv init
-RUN uv add agno cloudpickle openai ddgs duckduckgo-search yfinance youtube-transcript-api
+RUN uv add agno cloudpickle openai lmstudio
 
 # Install any additional dependencies if specified
 {{DEPENDENCIES_INSTALL}}
 
-# Copy the serialized agent
+# Copy the serialized agent and execution script
 COPY agent.pkl /workdir/agent.pkl
+COPY execute.py /workdir/execute.py
 
-# Set the default command to sleep (will be overridden at runtime)
-CMD ["sleep", "infinity"]
+# Add model name as a label
+LABEL kratos.model_name={{MODEL_NAME}}
+
+# Set the entry point to use uv run with execute.py
+ENTRYPOINT ["uv", "run", "python", "/workdir/execute.py"]
