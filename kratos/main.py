@@ -39,20 +39,20 @@ if __name__ == "__main__":
     print("🚀 Kratos: Serverless Intelligence Platform")
     print("=" * 45)
 
-    # Create and deploy a single test agent
-    print("🔄 Building and submitting test agent...")
+    # # Create and deploy a single test agent
+    # print("🔄 Building and submitting test agent...")
 
-    test_agent = Agent(
-        model=LMStudio(
-            id="qwen/qwen3-4b",
-            base_url="http://host.docker.internal:1234/v1",
-        ),
-        name="KratosWebSearch",
-        tools=[DuckDuckGoTools()],
-        instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
-        show_tool_calls=False,
-    )
-    print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
+    # test_agent = Agent(
+    #     model=LMStudio(
+    #         id="qwen/qwen3-4b",
+    #         base_url="http://host.docker.internal:1234/v1",
+    #     ),
+    #     name="KratosWebSearch",
+    #     tools=[DuckDuckGoTools()],
+    #     instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
+    #     show_tool_calls=False,
+    # )
+    # print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
 
     # Test single execution
     print("\n" + "="*50)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     print(f"\n\n⏱️  Execution time: {execution_time:.2f} seconds")
 
-    # Cleanup the agent
-    print("\n" + "="*50)
-    print("💰 Cleaning up agent...")
-    print(f"🗑️ {remove('test-agent')}")
+    # # Cleanup the agent
+    # print("\n" + "="*50)
+    # print("💰 Cleaning up agent...")
+    # print(f"🗑️ {remove('test-agent')}")

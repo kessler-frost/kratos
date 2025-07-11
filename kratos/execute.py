@@ -3,6 +3,7 @@ import sys
 import argparse
 import lmstudio as lms
 
+LMS_SERVER_API_HOST = "host.docker.internal:1234"
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Execute Kratos agent')
@@ -17,9 +18,13 @@ with open('/workdir/agent.pkl', 'rb') as f:
     agent = cloudpickle.load(f)
 
 # Run the agent with streaming enabled
-try:
+with lms.Client(LMS_SERVER_API_HOST) as client:
+    # Tell LMStudio to load the model
+    model = client.llm.load_new_instance(model_key=args.model_name, instance_identifier=args.container_name)
+
+    # Run the agent
     response = agent.run(args.instructions, stream=True)
-    
+
     # Handle streaming response properly
     if hasattr(response, '__iter__') and not isinstance(response, str):
         # Streaming response - print chunks as they come
@@ -38,7 +43,7 @@ try:
             print(response.content, end='', flush=True)  # pyright: ignore
         else:
             print(response, end='', flush=True)
-except Exception as e:
-    print(f"Error running agent (model: {args.model_name}, container: {args.container_name}): {e}", file=sys.stderr)
-    sys.exit(1)
+
+    # Unload the model
+    model.unload()
 
