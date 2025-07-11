@@ -1,7 +1,7 @@
 from agno.agent import Agent
 from agno.models.lmstudio import LMStudio
-from agno.tools.duckduckgo import DuckDuckGoTools
-from sandbox import bootstrap, invoke_agent, cleanup_agent
+from agno.tools.yfinance import YFinanceTools
+from kratos.sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
 from typing import Optional, List
 import time
@@ -10,11 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
     """Deploy an agent."""
-    try:
-        bootstrap(name, cloudpickle.dumps(agent), dependencies)
-        return f"Agent deployed: {name}"
-    except Exception as e:
-        return f"Failed: {e}"
+    bootstrap(name, cloudpickle.dumps(agent), dependencies)
+    return name
 
 
 def invoke(name: str, task: str, print_stream: bool = True) -> None:
@@ -24,23 +21,15 @@ def invoke(name: str, task: str, print_stream: bool = True) -> None:
     Be careful and disable print_stream if you are using a ThreadPoolExecutor.
     Otherwise, the output will be garbled.
     """
-    try:
-        for response in invoke_agent(name, task):
-            if print_stream:
-                print(response, end='', flush=True)
-    except Exception as e:
-        error_msg = f"Failed: {e}"
+    for response in invoke_agent(name, task):
         if print_stream:
-            print(error_msg, end='', flush=True)
+            print(response, end='', flush=True)
 
 
 def remove(name: str) -> str:
     """Remove an agent."""
-    try:
-        cleanup_agent(name)
-        return f"Agent {name} removed"
-    except Exception as e:
-        return f"Failed: {e}"
+    cleanup_agent(name)
+    return name
 
 
 if __name__ == "__main__":
@@ -56,9 +45,9 @@ if __name__ == "__main__":
             id="qwen/qwen3-4b",
             base_url="http://host.docker.internal:1234/v1",
         ),
-        name="KratosWebSearch",
-        tools=[DuckDuckGoTools()],
-        instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
+        name="KratosFinance",
+        tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True)],
+        instructions="You are Kratos Finance Agent, specialized in stock market analysis and financial data. Use YFinance to get current stock prices, analyst recommendations, and company information. When users ask about stocks, always provide current prices and relevant financial metrics. Be precise with numbers and explain what the data means for investment decisions.",
         show_tool_calls=False,
     )
     print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
