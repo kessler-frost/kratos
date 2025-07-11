@@ -9,17 +9,32 @@ paginate: true
 # Kratos  
 ### Serverless Intelligence
 
-What if AI agents didn't have to live on expensive servers 24/7?
+Platform for running ephemeral AI agents in isolated microVMs.
+
+What if intelligence didn't need to run on expensive servers 24/7?
 
 *For agent authors looking to build the next generation of intelligent systems*
 
 ---
 
+## Crash Course: Services, Serverless, Virtualization
+
+Service: Assume a chef living in your house always waiting/asking for next demand - you pay him monthly irrespective of how many meals you've had
+
+Serverless: Lives close to your house but you have to call him if you want something made - and he charges you on a per meal basis
+
+Virtualization - handling multiple chefs:
+Virtual Machine (VM): Separate floors for cooking
+microVM: Separate kitchens
+Docker: Same kitchen separate sets of knives and dishes
+
+---
+
 ## The Problem with Always-On AI
 
-Picture this: You've got an 80GB language model running on a beefy GPU server, burning electricity 24/7. 
+Picture this: You have successfully hosted an 80GB LLM on a beefy GPU server and are ready to do inference.
 
-Even when nobody's using it.
+Which even on idle will still be burning a whole in your wallet.
 
 ---
 
@@ -38,12 +53,12 @@ Even when nobody's using it.
 
 ## Enter Kratos
 
-Here's a crazy idea: What if agents only existed when they had work to do?
+Now: What if agents - and their intelligence - only existed when actually needed?
 
 - Spin up isolated microVMs on demand
 - Load exactly the model you need for the task
 - Run the agent, get the result, clean up completely
-- Each agent gets its own secure sandbox
+- Each agent gets its own targeted sandbox with the right model for the job
 
 ---
 
@@ -54,24 +69,24 @@ Here's a crazy idea: What if agents only existed when they had work to do?
 ## Why This Actually Makes Sense
 
 - **Zero idle costs** — your wallet (and the planet) will thank you
-- **Pick your model** — use Qwen3 for complex reasoning, smaller models for simple tasks
-- **Better economics** — you're incentivized to use the best model because it gives you the right answer faster
-- **Clean slate every time** — no memory leaks, no leftover state, no weird interactions
-- **Truly isolated** — one agent can't mess with another
-- **Scale without thinking** — need 100 agents? Sure, why not
+- **Pick your model** — use Qwen3 for complex reasoning, smaller models for simpler tasks
+- **Better economics** — when being charged for compute time, you get monetarily incentivized to use the best model for your particular task
+- **Clean slate every time** — no leftover states messing things up
+- **Truly isolated** — one agent can't hog resources from another
+- **Scale without thinking** — need 100 agents? Sure, why not - modular scaling prevents lengthy deployment times
 
 ---
 
 ## How It Works
 
-Think of it like serverless functions, but for AI:
+Think of it like serverless functions:
 
 1. Someone writes an agent and packages it with their chosen model
 2. They submit it to the registry
 3. When you need it, Kratos spins up a fresh microVM, runs your agent, returns results
 4. VM gets destroyed completely
 
-One thought at a time, isolated and secure.
+One thought at a time, isolated and targeted.
 
 ---
 
@@ -81,7 +96,7 @@ One thought at a time, isolated and secure.
 
 **MicroVMs** run their own kernel in milliseconds — true isolation with container-like speed.
 
-For AI agents handling potentially untrusted data, you want that bulletproof isolation.
+For AI agents handling potentially untrusted data, you want that bulletproof isolation with targeted model selection.
 
 **The ecosystem is rapidly evolving:** Apple's working on their own container tech, and companies like E2B are already building their entire platform on microVMs instead of Docker. This isn't just theory—it's happening now.
 
@@ -118,11 +133,11 @@ Why keep intelligence "on retainer" when you can summon it exactly when you need
 
 Instead of wrestling with model hosting, focus on what matters:
 
-- **Bundle your agent with its ideal model** — no compromise on performance
+- **Bundle your agent with its ideal model** — no compromise on performance, perfectly targeted
 - **Deploy once, scale infinitely** — each invocation gets a fresh, isolated environment
 - **Route intelligently** — different events can trigger different specialized agents
 - **Handle untrusted data safely** — complete isolation protects your system
-- **Build event-driven intelligence** — agents become just another function in your architecture
+- **Build event-driven intelligence** — targeted agents become just another function in your architecture
 
 ---
 
@@ -133,7 +148,7 @@ You're not deploying services anymore.
 You're designing **agent-native systems** where intelligence is:
 - Event-triggered, not always-on
 - Packaged with the perfect model for the job
-- Completely isolated and secure
+- Completely isolated and targeted
 - Ephemeral by design
 
 This is how you build the next generation of intelligent systems.
