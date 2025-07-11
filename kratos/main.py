@@ -5,6 +5,7 @@ from sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
 from typing import Iterator, Optional, List
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
@@ -39,42 +40,57 @@ if __name__ == "__main__":
     print("🚀 Kratos: Serverless Intelligence Platform")
     print("=" * 45)
 
-    # # Create and deploy a single test agent
-    # print("🔄 Building and submitting test agent...")
+    # Create and deploy a single test agent
+    print("🔄 Building and submitting test agent...")
 
-    # test_agent = Agent(
-    #     model=LMStudio(
-    #         id="qwen/qwen3-4b",
-    #         base_url="http://host.docker.internal:1234/v1",
-    #     ),
-    #     name="KratosWebSearch",
-    #     tools=[DuckDuckGoTools()],
-    #     instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
-    #     show_tool_calls=False,
-    # )
-    # print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
+    test_agent = Agent(
+        model=LMStudio(
+            id="qwen/qwen3-4b",
+            base_url="http://host.docker.internal:1234/v1",
+        ),
+        name="KratosWebSearch",
+        tools=[DuckDuckGoTools()],
+        instructions="You are Kratos Web Search Agent, specialized in finding current information from the web. Use DuckDuckGo to search for the latest news, facts, and information. Always provide up-to-date and accurate information from reliable sources. Be concise and focus on delivering the most relevant search results.",
+        show_tool_calls=False,
+    )
+    print(f"🚀 {submit(test_agent, 'test-agent', dependencies=['ddgs', 'duckduckgo-search'])}")
 
-    # Test single execution
+    # Test concurrent execution with ThreadPoolExecutor
     print("\n" + "="*50)
     print("🧪 Testing Agent Execution")
     print("="*50)
 
     task = "Hello, please introduce yourself and tell me what you can do."
     print(f"⚡ Task: {task}")
-    print("💬 Response:")
 
     # Measure execution time
     start_time = time.time()
 
-    for response_chunk in invoke('test-agent', task):
-        print(response_chunk, end='', flush=True)
+    # Run 3 concurrent agent invocations
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(invoke, 'test-agent', task) for _ in range(3)]
+        print(f"Submitted {len(futures)} concurrent tasks...")
+        
+        for i, future in enumerate(as_completed(futures), 1):
+            print(f"\n💬 Agent {i} Response:")
+            print("-" * 40)
+            try:
+                for response_chunk in future.result():
+                    print(response_chunk, end='', flush=True)
+                print("\n" + "-" * 40)
+            except Exception as e:
+                print(f"Error in agent {i}: {e}")
+                print("-" * 40)
 
     end_time = time.time()
     execution_time = end_time - start_time
 
-    print(f"\n\n⏱️  Execution time: {execution_time:.2f} seconds")
+    print(f"\n\n⏱️  Total execution time for 3 concurrent runs: {execution_time:.2f} seconds")
+    print(f"📊 Average time per agent: {execution_time/3:.2f} seconds")
+    print(f"🚀 Estimated sequential time would be: ~{execution_time*3:.2f} seconds")
+    print(f"⚡ Speedup achieved: ~{(execution_time*3)/execution_time:.1f}x faster")
 
-    # # Cleanup the agent
-    # print("\n" + "="*50)
-    # print("💰 Cleaning up agent...")
-    # print(f"🗑️ {remove('test-agent')}")
+    # Cleanup the agent
+    print("\n" + "="*50)
+    print("💰 Cleaning up agent...")
+    print(f"🗑️ {remove('test-agent')}")
