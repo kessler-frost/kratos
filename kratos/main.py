@@ -3,9 +3,9 @@ from agno.models.lmstudio import LMStudio
 from agno.tools.duckduckgo import DuckDuckGoTools
 from sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
-from typing import Iterator, Optional, List
+from typing import Optional, List
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 
 
 def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
@@ -17,13 +17,21 @@ def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) ->
         return f"Failed: {e}"
 
 
-def invoke(name: str, task: str) -> Iterator[str]:
-    """Run a task on an agent and yield results as they come."""
+def invoke(name: str, task: str, print_stream: bool = True) -> None:
+    """
+    Run a task on an agent and handle printing internally.
+
+    Be careful and disable print_stream if you are using a ThreadPoolExecutor.
+    Otherwise, the output will be garbled.
+    """
     try:
         for response in invoke_agent(name, task):
-            yield response
+            if print_stream:
+                print(response, end='', flush=True)
     except Exception as e:
-        yield f"Failed: {e}"
+        error_msg = f"Failed: {e}"
+        if print_stream:
+            print(error_msg, end='', flush=True)
 
 
 def remove(name: str) -> str:
@@ -67,20 +75,12 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Run 3 concurrent agent invocations
+    print(f"\n🚀 Starting 3 concurrent invocations at {time.strftime('%H:%M:%S')}")
+    
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(invoke, 'test-agent', task) for _ in range(3)]
-        print(f"Submitted {len(futures)} concurrent tasks...")
-        
-        for i, future in enumerate(as_completed(futures), 1):
-            print(f"\n💬 Agent {i} Response:")
-            print("-" * 40)
-            try:
-                for response_chunk in future.result():
-                    print(response_chunk, end='', flush=True)
-                print("\n" + "-" * 40)
-            except Exception as e:
-                print(f"Error in agent {i}: {e}")
-                print("-" * 40)
+        # Submit all tasks at once with print_stream=True
+        futures = [executor.submit(invoke, 'test-agent', task, False) for _ in range(3)]
+        wait(futures)
 
     end_time = time.time()
     execution_time = end_time - start_time
