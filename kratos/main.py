@@ -5,7 +5,7 @@ from sandbox import bootstrap, invoke_agent, cleanup_agent
 import cloudpickle
 from typing import Optional, List
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait
+from concurrent.futures import ThreadPoolExecutor, wait
 
 
 def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
