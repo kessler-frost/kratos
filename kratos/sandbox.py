@@ -178,7 +178,6 @@ def invoke_agent(name: str, instructions: str) -> Iterator[str]:
                 image=agent_image_name,
                 command=[
                     "--model_name", model_name,
-                    "--container_name", container_name,
                     "--instructions", instructions
                 ],
                 name=container_name,
