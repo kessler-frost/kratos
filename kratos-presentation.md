@@ -28,9 +28,11 @@ Virtual Machine (VM): Separate floors for cooking
 microVM: Separate kitchens
 Docker: Same kitchen separate sets of knives and dishes
 
+Right tool for the right job.
+
 ---
 
-## The Problem with Always-On AI
+## The Problems with AI Servers
 
 Picture this: You have successfully hosted an 80GB LLM on a beefy GPU server and are ready to do inference.
 
@@ -66,7 +68,7 @@ Now: What if agents - and their intelligence - only existed when actually needed
 
 ---
 
-## Why This Actually Makes Sense
+## Why This Makes Sense
 
 - **Zero idle costs** — your wallet (and the planet) will thank you
 - **Pick your model** — use Qwen3 for complex reasoning, smaller models for simpler tasks
@@ -119,11 +121,11 @@ Compare that to keeping massive models running 24/7 on cloud GPUs. The math is p
 
 ## The Philosophy
 
-Remember when people used to keep web servers running 24/7 just to serve a few requests per day? Then serverless came along and everyone realized how wasteful that was.
+In the recent years we have seen a dramatic shift from people running full-fledged services to instead do things in a serverless manner - using platforms like Vercel - as it helps you hit the ground running.
 
-AI is having the same moment right now.
+AI will soon have the same paradigm shift.
 
-**Just like how serverless functions became the backbone of event-driven systems, serverless intelligence will be the backbone of future system architecture.**
+**Just like how serverless functions became the backbone of event-driven systems, serverless intelligence will become the backbone of future system architectures.**
 
 Why keep intelligence "on retainer" when you can summon it exactly when you need it?
 
