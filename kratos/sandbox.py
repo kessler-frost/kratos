@@ -3,9 +3,12 @@
 # when they become available on the latest macOS for better performance per watt.
 
 import base64
+import cloudpickle
 import docker
 import os
 import tempfile
+import time
+import uuid
 from typing import Optional, List, Iterator
 
 
@@ -44,7 +47,6 @@ def _exec_command(container, command: str, workdir: str = WORKDIR) -> None:
 def _extract_model_id(serialized_agent: bytes) -> Optional[str]:
     """Extract the model ID from a serialized agent."""
     try:
-        import cloudpickle
         agent = cloudpickle.loads(serialized_agent)
         return agent.model.id
     except Exception:
@@ -58,13 +60,12 @@ def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
         tuple: (is_valid, error_message)
     """
     try:
-        import cloudpickle
         agent = cloudpickle.loads(serialized_agent)
         
-        # Check if model provider is Ollama
+        # Check if model provider is OpenAILike
         model_type = type(agent.model).__name__
-        if model_type != 'Ollama':
-            return False, f"Kratos only supports Ollama models for efficient local compute. Found: {model_type}"
+        if model_type != 'OpenAILike':
+            return False, f"Kratos only supports OpenAILike models for efficient local compute. Found: {model_type}"
         
         return True, ""
     except Exception as e:
@@ -72,82 +73,18 @@ def _validate_agent_model(serialized_agent: bytes) -> tuple[bool, str]:
 
 
 def _check_model_size(model_id: str, container) -> tuple[bool, str]:
-    """Check if model size is within Kratos limits (< 6GB).
+    """Check if model is available for OpenAILike connection.
     
-    Pulls the model and checks its actual size for efficiency and optimization.
+    For OpenAILike models, we don't need to pull or check size since they're accessed via API.
     
     Returns:
-        tuple: (is_valid, error_message_or_size)
+        tuple: (is_valid, success_message)
     """
-    try:
-        # Pull the model to get accurate size information (with timeout for large models)
-        pull_result = container.exec_run(["/bin/bash", "-c", f"timeout {MODEL_PULL_TIMEOUT}s ollama pull {model_id}"])
-        if pull_result.exit_code != 0:
-            pull_output = pull_result.output.decode() if pull_result.output else ""
-            if "timeout" in pull_output.lower() or pull_result.exit_code == 124:
-                return False, f"Model {model_id} pull timed out (likely >{MODEL_SIZE_LIMIT_GB}GB). Kratos supports models ≤{MODEL_SIZE_LIMIT_GB}GB for efficiency and optimization."
-            elif "not found" in pull_output.lower():
-                return False, f"Model {model_id} not found in Ollama registry."
-            else:
-                return False, f"Failed to pull model {model_id}: {pull_output}"
-        
-        # Get the actual model size using ollama show
-        result = container.exec_run(["/bin/bash", "-c", f"ollama show {model_id} | grep -i 'size\\|parameters' || ollama list | grep '{model_id}'"])
-        
-        if result.exit_code == 0:
-            output = result.output.decode().strip()
-            
-            # Try to extract size from ollama list output (more reliable)
-            list_result = container.exec_run(["/bin/bash", "-c", f"ollama list | grep '{model_id}' | head -1"])
-            if list_result.exit_code == 0:
-                list_output = list_result.output.decode().strip()
-                if list_output:
-                    # Parse ollama list format: NAME    ID    SIZE    MODIFIED
-                    parts = list_output.split()
-                    if len(parts) >= 3:
-                        size_str = parts[2]  # Third column is size
-                        try:
-                            size_gb = _parse_size_to_gb(size_str)
-                            if size_gb > 6.0:
-                                return False, f"Model {model_id} size ({size_str}) exceeds 6GB limit. Kratos supports models ≤6GB for efficiency and optimization."
-                            else:
-                                return True, f"Model size: {size_str}"
-                        except ValueError:
-                            # If we can't parse the size, allow it but warn
-                            return True, f"Model size: {size_str} (format not recognized, proceeding)"
-        
-        # If we can't determine size, allow it but warn
-        return True, "Model size: unknown (proceeding)"
-        
-    except Exception as e:
-        return False, f"Failed to check model size: {e}"
+    # For OpenAILike models, we don't need to check size as they're accessed via API
+    return True, f"Model {model_id} configured for OpenAI-like API access"
 
 
-def _parse_size_to_gb(size_str: str) -> float:
-    """Parse size string to GB for comparison."""
-    import re
-    
-    size_str = size_str.strip().upper()
-    
-    # Extract number and unit
-    match = re.match(r'([0-9.]+)\s*([A-Z]*)', size_str)
-    if not match:
-        raise ValueError(f"Cannot parse size: {size_str}")
-    
-    value = float(match.group(1))
-    unit = match.group(2) if match.group(2) else 'B'
-    
-    # Convert to GB
-    if unit == 'GB':
-        return value
-    elif unit == 'MB':
-        return value / 1024
-    elif unit == 'KB':
-        return value / (1024 * 1024)
-    elif unit == 'B':
-        return value / (1024 * 1024 * 1024)
-    else:
-        raise ValueError(f"Unknown unit: {unit}")
+# Size parsing function removed as it's no longer needed for OpenAILike models
 
 
 def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
@@ -218,14 +155,8 @@ def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: O
         else:
             dependencies_install = "# No additional dependencies"
         
-        # Prepare model pull command with timeout
-        if model_id:
-            model_pull = f"""RUN nohup ollama serve > /dev/null 2>&1 & \\
-    sleep 10 && \\
-    timeout {MODEL_PULL_TIMEOUT} ollama pull {model_id} && \\
-    pkill -f ollama"""
-        else:
-            model_pull = "# No model to pull"
+        # For OpenAILike models, no need to pull models locally
+        model_pull = "# OpenAILike models are accessed via API, no local pulling needed"
         
         # Replace template placeholders
         dockerfile_content = dockerfile_content.replace("{{DEPENDENCIES_INSTALL}}", dependencies_install)
@@ -274,7 +205,6 @@ def invoke_agent(name: str, instructions: str) -> Iterator[str]:
     
     try:
         # Generate unique container name for this invocation
-        import uuid
         container_name = f"kratos-invoke-{name}-{uuid.uuid4().hex[:4]}"
         
         # Create and start ephemeral container
@@ -282,7 +212,7 @@ def invoke_agent(name: str, instructions: str) -> Iterator[str]:
             container = client.containers.create(
                 name=container_name, 
                 image=agent_image_name, 
-                command=["ollama", "serve"], 
+                command=["sleep", "infinity"],  # Keep container running for script execution
                 detach=True
             )
             container.start()
@@ -331,10 +261,6 @@ except Exception as e:
         # Write the Python script to a temporary file in the container
         script_content_b64 = base64.b64encode(python_script.encode('utf-8')).decode('utf-8')
         _exec_command(container, f'echo "{script_content_b64}" | base64 -d > /run_agent.py', workdir="/")
-        
-        # Execute the Python script with instructions as argument and timeout
-        import threading
-        import time
         
         start_time = time.time()
         

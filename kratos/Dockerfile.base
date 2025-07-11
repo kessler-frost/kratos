@@ -1,28 +1,12 @@
 FROM ghcr.io/astral-sh/uv:debian-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    ca-certificates \
-    wget \
-    coreutils \
-    procps \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
-
 # Create working directory
 RUN mkdir -p /workdir
 WORKDIR /workdir
 
 # Initialize uv project and install common dependencies
-# uv is already installed in the base image
 RUN uv init
-RUN uv add ollama agno cloudpickle
+RUN uv add agno cloudpickle openai
 
-# Pre-install common agent dependencies
-RUN uv add ddgs duckduckgo-search yfinance youtube-transcript-api
-
-# Set the default command to serve ollama
-CMD ["ollama", "serve"]
+# Set the default command to sleep (will be overridden in specific containers)
+CMD ["sleep", "infinity"]

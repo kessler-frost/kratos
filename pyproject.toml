@@ -10,7 +10,9 @@ dependencies = [
     "ddgs>=9.0.0",
     "docker>=7.1.0",
     "duckduckgo-search>=8.1.1",
-    "ollama>=0.5.1",
+    "ipykernel>=6.29.5",
+    "ipywidgets>=8.1.7",
+    "openai>=1.95.0",
     "yfinance>=0.2.65",
     "youtube-transcript-api>=1.1.1",
 ]

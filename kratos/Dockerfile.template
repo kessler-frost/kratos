@@ -3,11 +3,8 @@ FROM kratos-base:latest
 # Install any additional dependencies if specified
 {{DEPENDENCIES_INSTALL}}
 
-# Pull the specific model required by the agent
-{{MODEL_PULL}}
-
 # Copy the serialized agent
 COPY agent.pkl /workdir/agent.pkl
 
-# Set the default command to serve ollama
-CMD ["ollama", "serve"]
+# Set the default command to sleep (will be overridden at runtime)
+CMD ["sleep", "infinity"]
