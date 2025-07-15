@@ -2,8 +2,6 @@
 
 Kratos is a serverless intelligence platform for running ephemeral AI agents in isolated microVMs.
 
-================================================================================================================
-
 🎯 Core Vision:
 •  Serverless compute platform for ephemeral agents
 •  Micro-task execution: search, parsing, editing, content generation
