@@ -5,7 +5,7 @@ description = "Kratos is a serverless intelligence platform for running ephemera
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "agno>=1.7.2",
+    "agno[aws]>=1.7.2",
     "cloudpickle>=3.1.1",
     "docker>=7.1.0",
     "ipykernel>=6.29.5",

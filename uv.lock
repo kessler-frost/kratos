@@ -30,6 +30,36 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7d/24/884cbd1133e3b9985d53733250251098caead365bb8706af8da105813abe/agno-1.7.2-py3-none-any.whl", hash = "sha256:37a1985e67762f0d8016318ba5d8b8697c855827d7c86b21a41cdff088294cc2", size = 888229, upload-time = "2025-07-10T15:50:04.262Z" },
 ]
 
+[package.optional-dependencies]
+aws = [
+    { name = "agno-aws" },
+    { name = "agno-docker" },
+]
+
+[[package]]
+name = "agno-aws"
+version = "0.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/eb/d8fb330afdbaea5b6fb5173a7b9a7656f3e8674a15fbf984d9622d1d6dc2/agno_aws-0.0.2.tar.gz", hash = "sha256:f0e3f05e8e6f1db52a88913174ddcabb79cfec9f6337b5c3c7333d9e763e3197", size = 71637, upload-time = "2025-05-16T16:32:23.182Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/7e/31c2fc6d567109c20063b3c30bf3dff7e19e0a7b4b5414b2c6561436ec1f/agno_aws-0.0.2-py3-none-any.whl", hash = "sha256:601b16cc57c6a637326ade851d9a27969abda567c4dc971cd45ff90495381484", size = 99775, upload-time = "2025-05-16T16:32:22.214Z" },
+]
+
+[[package]]
+name = "agno-docker"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docker" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/43/08/1842af7822e9fd3e899c5a472ede3bdc5e6cecdea7612ac9f151ea98751c/agno_docker-0.0.1.tar.gz", hash = "sha256:e74d5d21df48fb7cff8dc126a8d9f76bd57bb108d0d45efa5b1f4aeae0f027db", size = 21482, upload-time = "2025-01-30T23:24:32.816Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/07/50339a49d2c058c44fda684c38f06b2f144f8b20089484bb6d11017a7784/agno_docker-0.0.1-py3-none-any.whl", hash = "sha256:d4aed51a9f37bbf901e94f80b4a68a8bd91eaf68fff5ffdfee1cc637e2c3c780", size = 30155, upload-time = "2025-01-30T23:24:30.84Z" },
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -82,6 +112,34 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d8/e4/0c4c39e18fd76d6a628d4dd8da40543d136ce2d1752bd6eeeab0791f4d6b/beautifulsoup4-4.13.4.tar.gz", hash = "sha256:dbb3c4e1ceae6aefebdaf2423247260cd062430a410e38c66f2baa50a8437195", size = 621067, upload-time = "2025-04-15T17:05:13.836Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/50/cd/30110dc0ffcf3b131156077b90e9f60ed75711223f306da4db08eff8403b/beautifulsoup4-4.13.4-py3-none-any.whl", hash = "sha256:9bbbb14bfde9d79f38b8cd5f8c7c85f4b8f2523190ebed90e950a8dea4cb1c4b", size = 187285, upload-time = "2025-04-15T17:05:12.221Z" },
+]
+
+[[package]]
+name = "boto3"
+version = "1.39.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "botocore" },
+    { name = "jmespath" },
+    { name = "s3transfer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9b/e5/7a0e98d88212b532fbf4b6fb6ace997c522a1b88d39d76d41b0f5ed14796/boto3-1.39.9.tar.gz", hash = "sha256:e3d3a6b617e1575e7ec854c820a882ab2e189a0421e74dc0dca2c9e13d4370a5", size = 111851, upload-time = "2025-07-18T19:22:50.28Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/82/faf1b3bab5a94c3a3cf9ddc8e04eee2bdc29d5b8da42d7cda905c505e311/boto3-1.39.9-py3-none-any.whl", hash = "sha256:5bc85e9fdec4e21ef5ca2c22b4d51a3e32b53f3da36ce51f5a3ea4dbde07b132", size = 139887, upload-time = "2025-07-18T19:22:48.85Z" },
+]
+
+[[package]]
+name = "botocore"
+version = "1.39.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jmespath" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4d/d3/fd0a230e320a6e23932887fa6e508b90ccad2c1be77d4e88855cfad9cbe7/botocore-1.39.9.tar.gz", hash = "sha256:02f141c2849e4589a79feea245ce4ecc478d48b7865572445af8aae3b041772d", size = 14215273, upload-time = "2025-07-18T19:22:38.011Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/2d/951352b2a14e70144c1a4dff611472a6213b8dbdb7996c0029caa48c80e3/botocore-1.39.9-py3-none-any.whl", hash = "sha256:a9691cbe03a3bc8b2720b3c36e5c5a2eecace6acd72bfb1107f00e75edaec4f3", size = 13874123, upload-time = "2025-07-18T19:22:33.422Z" },
 ]
 
 [[package]]
@@ -571,6 +629,15 @@ wheels = [
 ]
 
 [[package]]
+name = "jmespath"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/2a/e867e8531cf3e36b41201936b7fa7ba7b5702dbef42922193f05c8976cd6/jmespath-1.0.1.tar.gz", hash = "sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe", size = 25843, upload-time = "2022-06-17T18:00:12.224Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/31/b4/b9b800c45527aadd64d5b442f9b932b00648617eb5d63d2c7a6587b7cafc/jmespath-1.0.1-py3-none-any.whl", hash = "sha256:02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980", size = 20256, upload-time = "2022-06-17T18:00:10.251Z" },
+]
+
+[[package]]
 name = "jupyter-client"
 version = "8.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -614,7 +681,7 @@ name = "kratos"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "agno" },
+    { name = "agno", extra = ["aws"] },
     { name = "cloudpickle" },
     { name = "docker" },
     { name = "ipykernel" },
@@ -627,7 +694,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agno", specifier = ">=1.7.2" },
+    { name = "agno", extras = ["aws"], specifier = ">=1.7.2" },
     { name = "cloudpickle", specifier = ">=3.1.1" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
@@ -1229,6 +1296,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/53/830aa4c3066a8ab0ae9a9955976fb770fe9c6102117c8ec4ab3ea62d89e8/rich-14.0.0.tar.gz", hash = "sha256:82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725", size = 224078, upload-time = "2025-03-30T14:15:14.23Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/9b/63f4c7ebc259242c89b3acafdb37b41d1185c07ff0011164674e9076b491/rich-14.0.0-py3-none-any.whl", hash = "sha256:1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0", size = 243229, upload-time = "2025-03-30T14:15:12.283Z" },
+]
+
+[[package]]
+name = "s3transfer"
+version = "0.13.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "botocore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6d/05/d52bf1e65044b4e5e27d4e63e8d1579dbdec54fce685908ae09bc3720030/s3transfer-0.13.1.tar.gz", hash = "sha256:c3fdba22ba1bd367922f27ec8032d6a1cf5f10c934fb5d68cf60fd5a23d936cf", size = 150589, upload-time = "2025-07-18T19:22:42.31Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/4f/d073e09df851cfa251ef7840007d04db3293a0482ce607d2b993926089be/s3transfer-0.13.1-py3-none-any.whl", hash = "sha256:a981aa7429be23fe6dfc13e80e4020057cbab622b08c0315288758d67cabc724", size = 85308, upload-time = "2025-07-18T19:22:40.947Z" },
 ]
 
 [[package]]
