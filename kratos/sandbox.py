@@ -51,7 +51,7 @@ def _extract_model_name(serialized_agent: bytes) -> str:
         return 'unknown'
 
 
-def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None) -> None:
+def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None, recreate: bool = False) -> None:
     """
     Bootstrap a lightweight, ephemeral agent for serverless micro-task execution.
     
@@ -75,16 +75,27 @@ def bootstrap(name: str, serialized_agent: bytes, dependencies: Optional[List[st
     # Extract model name for later use
     model_name = _extract_model_name(serialized_agent)
     
-    # Clean up any existing image with the same name
+    # Check if image already exists
     agent_image_name = f"kratos-agent-{name}"
+    image_exists = False
     try:
-        existing_image = client.images.get(agent_image_name)
-        client.images.remove(existing_image.id, force=True)
+        client.images.get(agent_image_name)
+        image_exists = True
     except docker.errors.ImageNotFound:  # pyright: ignore
-        pass  # Image doesn't exist, which is fine
+        image_exists = False
     
-    # Build custom image with dependencies directly
-    _build_agent_image(agent_image_name, serialized_agent, dependencies, model_name)
+    # Only build if recreate=True or image doesn't exist
+    if recreate or not image_exists:
+        # Clean up existing image if recreating
+        if recreate and image_exists:
+            try:
+                existing_image = client.images.get(agent_image_name)
+                client.images.remove(existing_image.id, force=True)
+            except docker.errors.ImageNotFound:  # pyright: ignore
+                pass  # Image doesn't exist, which is fine
+        
+        # Build custom image with dependencies directly
+        _build_agent_image(agent_image_name, serialized_agent, dependencies, model_name)
 
 
 def _build_agent_image(image_name: str, serialized_agent: bytes, dependencies: Optional[List[str]] = None, model_name: str = "unknown") -> None:

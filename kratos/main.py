@@ -7,9 +7,9 @@ from typing import Optional, List
 import time
 
 
-def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None) -> str:
+def submit(agent: Agent, name: str, dependencies: Optional[List[str]] = None, recreate: bool = False) -> str:
     """Deploy an agent."""
-    bootstrap(name, cloudpickle.dumps(agent), dependencies)
+    bootstrap(name, cloudpickle.dumps(agent), dependencies, recreate)
     return name
 
 
